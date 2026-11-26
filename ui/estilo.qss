@@ -1,0 +1,207 @@
+/* ===== tela Adicionar música ===== */
+
+QMainWindow {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                stop:0 @fundo_a, stop:1 @fundo_b);
+    color: @texto;
+}
+QMainWindow > QWidget {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                stop:0 @fundo_a, stop:1 @fundo_b);
+}
+QWidget { font-family: "Manrope"; color: @texto; }
+
+QFrame#lateral {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                stop:0 @superficie_a, stop:1 @superficie_b);
+    border-right: 1px solid @borda;
+}
+QFrame#painelAtual {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                stop:0 @superficie_a, stop:1 @superficie_b);
+    border-left: 1px solid @borda;
+}
+QFrame#barraPlayer {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                stop:0 @superficie_a, stop:1 @superficie_b);
+    border-top: 1px solid @borda;
+}
+QLabel#secao { color: @texto_suave; }
+
+QPushButton#navegacao {
+    background: transparent; color: @texto_suave;
+    border: none; border-left: 2px solid transparent; border-radius: 3px;
+    text-align: left; padding: 8px 10px;
+}
+QPushButton#navegacao:hover { background: @cartao; color: @texto; }
+QPushButton#navegacao:checked {
+    background: @azul_escuro; color: @azul_claro;
+    border-left: 2px solid @azul;
+}
+QPushButton#coracao {
+    background: transparent; border: none; color: @lilas_claro;
+}
+QPushButton#coracao:hover {
+    background: @lilas_escuro; color: @texto; border-radius: 3px;
+}
+QLabel#selo {
+    background: @lilas_escuro; border: 1px solid @lilas; border-radius: 3px;
+    color: @texto; padding: 2px 6px;
+}
+QFrame#divisor { background: @borda; border: none; }
+
+QLineEdit {
+    background: @cartao; border: 1px solid @borda_forte;
+    border-radius: 3px; color: @texto; padding: 6px 8px;
+    selection-background-color: @azul;
+    selection-color: @texto_sobre_destaque;
+}
+QLineEdit:focus { border-color: @azul; }
+QPushButton#botaoIcone {
+    background: transparent; border: none; border-radius: 3px;
+    color: @texto_suave; padding: 4px;
+}
+QPushButton#botaoIcone:hover { background: @elevado; color: @texto; }
+QPushButton#botaoIcone:checked { color: @azul_claro; }
+QStackedWidget, QStackedWidget > QWidget, QScrollArea, QListWidget {
+    background: transparent; border: none;
+}
+QAbstractScrollArea::viewport { background: transparent; }
+QListWidget { outline: none; }
+QListWidget::item { background: transparent; }
+
+QScrollArea#areaLista > QWidget > QWidget { background: transparent; }
+
+QFrame#zonaArraste {
+    background: @fundo; border: 1px dashed @borda; border-radius: 3px;
+}
+QFrame#zonaArraste[arrastando="true"] {
+    border: 1px dashed @azul; background: @superficie;
+}
+#uploadIcone { font-size: 26px; color: @texto_suave; }
+QSlider::groove:horizontal {
+    background: @azul_escuro; border: none; height: 4px; border-radius: 2px;
+}
+QSlider::sub-page:horizontal { background: @azul; border-radius: 2px; }
+QSlider::add-page:horizontal { background: @azul_escuro; border-radius: 2px; }
+QSlider::handle:horizontal {
+    background: @azul_claro; border: 1px solid @cartao;
+    width: 10px; height: 10px; margin: -3px 0; border-radius: 5px;
+}
+QSlider::handle:horizontal:hover { background: @azul; }
+QPushButton#botaoPlay {
+    background: @azul; color: @texto_sobre_destaque;
+    border: none; border-radius: 3px;
+}
+QPushButton#botaoPlay:hover { background: @azul_claro; }
+
+QFrame#card, QFrame#itemArquivo {
+    background: @cartao; border: 1px solid @borda; border-radius: 3px;
+}
+QFrame#cartaoTema {
+    background: @cartao; border: 1px solid @borda; border-radius: 3px;
+}
+QFrame#cartaoTema[selecionado="true"] { border-color: @azul; }
+QLabel#amostraTema { border: 1px solid @borda; border-radius: 2px; }
+#cardTitulo { font-size: 15px; }
+#cardDesc { font-size: 13px; color: @texto_suave; }
+#infoItem { font-size: 12px; color: @texto_suave; }
+#status { font-size: 13px; color: @texto_suave; }
+
+/* campos de texto dentro de cada arquivo */
+QLineEdit#campoItem, QLineEdit#campoArtista {
+    background: @cartao; border: 1px solid @borda_forte; border-radius: 3px;
+    padding: 2px 6px; min-width: 0;
+}
+QLineEdit#campoItem { font-size: 15px; font-weight: 600; }
+QLineEdit#campoArtista { font-size: 13px; color: @texto_suave; }
+QLineEdit#campoItem:hover, QLineEdit#campoArtista:hover { border-color: @borda_forte; }
+QLineEdit#campoItem:focus, QLineEdit#campoArtista:focus {
+    border-color: @azul; background: @cartao;
+}
+
+/* botão de capa */
+QPushButton#capaEscolher {
+    background: @elevado; border: 1px dashed @borda_forte; border-radius: 3px;
+    color: @texto_suave; font-size: 12px;
+}
+QPushButton#capaEscolher:hover {
+    border-color: @azul; color: @texto;
+}
+
+/* botões de qualidade (128 / 192 / 320) */
+QPushButton#qualidade {
+    background: transparent; border: 1px solid @borda_forte; border-radius: 3px;
+    padding: 6px 12px; color: @texto_suave;
+    font-family: "Consolas", monospace; font-size: 13px;
+}
+QPushButton#qualidade:hover { color: @texto; }
+QPushButton#qualidade:checked {
+    background: @elevado; border-color: @azul; color: @texto;
+}
+QPushButton#qualidade:disabled { color: @texto_fraco; border-color: @borda; }
+
+/* botões gerais */
+QPushButton#secundario {
+    background: @elevado; border: 1px solid @borda_forte; border-radius: 3px;
+    padding: 8px 16px;
+}
+QPushButton#secundario:hover { background: @elevado; }
+
+QPushButton#primario {
+    background: @azul; color: @texto_sobre_destaque;
+    border: none; border-radius: 3px;
+    padding: 10px 18px; font-weight: 600;
+}
+QPushButton#primario:hover {
+    background: @azul_claro; color: @texto_sobre_destaque;
+}
+QPushButton#primario:disabled { background: @elevado; color: @texto_suave; }
+
+/* lista de playlists */
+QComboBox {
+    background: @cartao; border: 1px solid @borda_forte; border-radius: 3px;
+    padding: 8px 12px; min-width: 150px;
+}
+QComboBox:hover, QComboBox:focus { border-color: @azul; }
+QComboBox QAbstractItemView {
+    background: @cartao; border: 1px solid @borda_forte;
+    selection-background-color: @azul;
+    selection-color: @texto_sobre_destaque; outline: none;
+}
+
+QToolTip {
+    background: @elevado; color: @texto; border: 1px solid @borda; padding: 4px 8px;
+}
+
+/* ===== playlists: menu do pincel e janelas de diálogo ===== */
+
+QMenu {
+    background: @cartao; border: 1px solid @borda; padding: 4px;
+}
+QMenu::item { padding: 8px 24px 8px 14px; border-radius: 2px; }
+QMenu::item:selected {
+    background: @azul; color: @texto_sobre_destaque;
+}
+QMenu::separator { height: 1px; background: @borda; margin: 4px 6px; }
+
+QDialog { background: @superficie; }
+QDialog QLabel { color: @texto; }
+QDialog QPushButton {
+    background: @elevado; border: 1px solid @borda_forte; border-radius: 3px;
+    padding: 7px 18px; min-width: 70px;
+}
+QDialog QPushButton:hover { background: @elevado; }
+QDialog QPushButton:default { border-color: @azul; color: @azul; }
+
+/* ===== menu de botão direito (coração, fila, lixeira) ===== */
+
+QFrame#menuMusica {
+    background: @cartao; border: 1px solid @borda; border-radius: 3px;
+}
+
+QPushButton#botaoMenu {
+    background: transparent; border: none; border-radius: 3px; padding: 0;
+}
+QPushButton#botaoMenu:hover { background: @elevado; }
+QPushButton#botaoMenu:pressed { background: @elevado; }
