@@ -4,6 +4,7 @@ from PySide6.QtGui import (QBrush, QColor, QIcon, QPainter, QPainterPath, QPen,
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QPushButton
 
 from ui import temas, util
+from ui.icones import pixmap
 
 
 # ---------- ícones desenhados à mão (tela de 44 x 44) ----------
@@ -50,6 +51,9 @@ def _lixeira(p, cheio):
 
 
 def _icone(desenhar, cor, cheio=False):
+    if desenhar is _coracao:
+        return QIcon(pixmap("coracao", cor=cor, tamanho=20, cheio=cheio))
+
     pm = QPixmap(44, 44)
     pm.fill(Qt.transparent)
     p = QPainter(pm)
@@ -71,7 +75,7 @@ class BotaoMenu(QPushButton):
         self.setFixedSize(40, 36)
         self.setIconSize(QSize(20, 20))
         self.setCursor(Qt.PointingHandCursor)
-        cor_normal = (temas.cor("lilas_claro")
+        cor_normal = (temas.cor("hud_amarelo") or temas.cor("lilas_claro")
                       if cheio or desenhar is _coracao else util.TEXTO_SUAVE)
         self._normal = _icone(desenhar, cor_normal, cheio)
         self._hover = _icone(desenhar, cor_hover, cheio)
@@ -95,11 +99,14 @@ class MenuMusica(QFrame):
         self.setObjectName("menuMusica")
         self.setAttribute(Qt.WA_DeleteOnClose)
         favorita = bool(musica["favorita"])
+        cor_favorito = (
+            temas.cor("hud_amarelo") or
+            (temas.cor("texto") if favorita else temas.cor("lilas_claro")))
 
         b_favorito = BotaoMenu(
             _coracao,
             "Remover dos favoritos" if favorita else "Adicionar aos favoritos",
-            temas.cor("texto") if favorita else temas.cor("lilas_claro"),
+            cor_favorito,
             cheio=favorita)
         b_playlist = BotaoMenu(_fila, "Adicionar à playlist", util.AZUL)
         b_excluir = BotaoMenu(_lixeira, "Excluir música", temas.cor("perigo"))

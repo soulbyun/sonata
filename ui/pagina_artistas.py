@@ -37,6 +37,7 @@ class LinhaArtista(QStyledItemDelegate):
         largura = max(r.right() - 50 - x_texto, 20)
 
         fonte_nome = QFont(option.font)
+        fonte_nome.setFamily("Zen Maru Gothic")
         fonte_nome.setPixelSize(15)
         painter.setFont(fonte_nome)
         painter.setPen(QColor(util.TEXTO))

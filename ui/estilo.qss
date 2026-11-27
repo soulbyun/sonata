@@ -10,6 +10,16 @@ QMainWindow > QWidget {
                                 stop:0 @fundo_a, stop:1 @fundo_b);
 }
 QWidget { font-family: "Manrope"; color: @texto; }
+QLabel#barraTitulo, QLabel#barraArtista, QLabel#painelTitulo,
+QLabel#painelArtista, QLineEdit#campoItem, QLineEdit#campoArtista {
+    font-family: "Zen Maru Gothic";
+}
+QLabel#painelTitulo {
+    font-size: 20px; font-weight: 700; color: @texto;
+}
+QLabel#painelArtista {
+    font-size: 16px; color: @texto_suave;
+}
 
 QFrame#lateral {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
@@ -26,13 +36,24 @@ QFrame#barraPlayer {
                                 stop:0 @superficie_a, stop:1 @superficie_b);
     border-top: 1px solid @borda;
 }
+QFrame#lateral[mafty="true"],
+QFrame#painelAtual[mafty="true"],
+QFrame#barraPlayer[mafty="true"] {
+    background: @superficie;
+}
 QLabel#secao { color: @texto_suave; }
+QLabel#logo {
+    font-family: "Zen Maru Gothic";
+    font-size: 24px;
+    font-weight: 700;
+}
 
 QPushButton#navegacao {
     background: transparent; color: @texto_suave;
-    border: none; border-left: 2px solid transparent; border-radius: 3px;
+    border: none; border-left: 2px solid transparent; border-radius: @raio;
     text-align: left; padding: 8px 10px;
 }
+QPushButton#adicionar { text-align: left; padding: 8px 10px; }
 QPushButton#navegacao:hover { background: @cartao; color: @texto; }
 QPushButton#navegacao:checked {
     background: @azul_escuro; color: @azul_claro;
@@ -42,23 +63,23 @@ QPushButton#coracao {
     background: transparent; border: none; color: @lilas_claro;
 }
 QPushButton#coracao:hover {
-    background: @lilas_escuro; color: @texto; border-radius: 3px;
+    background: @lilas_escuro; color: @texto; border-radius: @raio;
 }
 QLabel#selo {
-    background: @lilas_escuro; border: 1px solid @lilas; border-radius: 3px;
+    background: @lilas_escuro; border: 1px solid @lilas; border-radius: @raio;
     color: @texto; padding: 2px 6px;
 }
 QFrame#divisor { background: @borda; border: none; }
 
 QLineEdit {
     background: @cartao; border: 1px solid @borda_forte;
-    border-radius: 3px; color: @texto; padding: 6px 8px;
+    border-radius: @raio; color: @texto; padding: 6px 8px;
     selection-background-color: @azul;
     selection-color: @texto_sobre_destaque;
 }
 QLineEdit:focus { border-color: @azul; }
 QPushButton#botaoIcone {
-    background: transparent; border: none; border-radius: 3px;
+    background: transparent; border: none; border-radius: @raio;
     color: @texto_suave; padding: 4px;
 }
 QPushButton#botaoIcone:hover { background: @elevado; color: @texto; }
@@ -66,6 +87,7 @@ QPushButton#botaoIcone:checked { color: @azul_claro; }
 QStackedWidget, QStackedWidget > QWidget, QScrollArea, QListWidget {
     background: transparent; border: none;
 }
+QStackedWidget[mafty="true"] { background: @superficie; }
 QAbstractScrollArea::viewport { background: transparent; }
 QListWidget { outline: none; }
 QListWidget::item { background: transparent; }
@@ -73,36 +95,37 @@ QListWidget::item { background: transparent; }
 QScrollArea#areaLista > QWidget > QWidget { background: transparent; }
 
 QFrame#zonaArraste {
-    background: @fundo; border: 1px dashed @borda; border-radius: 3px;
+    background: @fundo; border: 1px dashed @borda; border-radius: @raio;
 }
 QFrame#zonaArraste[arrastando="true"] {
     border: 1px dashed @azul; background: @superficie;
 }
 #uploadIcone { font-size: 26px; color: @texto_suave; }
 QSlider::groove:horizontal {
-    background: @azul_escuro; border: none; height: 4px; border-radius: 2px;
+    background: @azul_escuro; border: none; height: 4px; border-radius: @raio;
 }
-QSlider::sub-page:horizontal { background: @azul; border-radius: 2px; }
-QSlider::add-page:horizontal { background: @azul_escuro; border-radius: 2px; }
+QSlider::sub-page:horizontal { background: @azul; border-radius: @raio; }
+QSlider::add-page:horizontal { background: @azul_escuro; border-radius: @raio; }
 QSlider::handle:horizontal {
-    background: @azul_claro; border: 1px solid @cartao;
-    width: 10px; height: 10px; margin: -3px 0; border-radius: 5px;
+    background: transparent; border: none;
+    width: 18px; height: 18px; margin: -7px 0;
+    border-radius: @raio_puxador;
 }
-QSlider::handle:horizontal:hover { background: @azul; }
+QSlider::handle:horizontal:hover { background: transparent; }
 QPushButton#botaoPlay {
     background: @azul; color: @texto_sobre_destaque;
-    border: none; border-radius: 3px;
+    border: none; border-radius: @raio;
 }
 QPushButton#botaoPlay:hover { background: @azul_claro; }
 
 QFrame#card, QFrame#itemArquivo {
-    background: @cartao; border: 1px solid @borda; border-radius: 3px;
+    background: @cartao; border: 1px solid @borda; border-radius: @raio;
 }
 QFrame#cartaoTema {
-    background: @cartao; border: 1px solid @borda; border-radius: 3px;
+    background: @cartao; border: 1px solid @borda; border-radius: @raio;
 }
 QFrame#cartaoTema[selecionado="true"] { border-color: @azul; }
-QLabel#amostraTema { border: 1px solid @borda; border-radius: 2px; }
+QLabel#amostraTema { border: 1px solid @borda; border-radius: @raio; }
 #cardTitulo { font-size: 15px; }
 #cardDesc { font-size: 13px; color: @texto_suave; }
 #infoItem { font-size: 12px; color: @texto_suave; }
@@ -110,7 +133,7 @@ QLabel#amostraTema { border: 1px solid @borda; border-radius: 2px; }
 
 /* campos de texto dentro de cada arquivo */
 QLineEdit#campoItem, QLineEdit#campoArtista {
-    background: @cartao; border: 1px solid @borda_forte; border-radius: 3px;
+    background: @cartao; border: 1px solid @borda_forte; border-radius: @raio;
     padding: 2px 6px; min-width: 0;
 }
 QLineEdit#campoItem { font-size: 15px; font-weight: 600; }
@@ -122,7 +145,7 @@ QLineEdit#campoItem:focus, QLineEdit#campoArtista:focus {
 
 /* botão de capa */
 QPushButton#capaEscolher {
-    background: @elevado; border: 1px dashed @borda_forte; border-radius: 3px;
+    background: @elevado; border: 1px dashed @borda_forte; border-radius: @raio;
     color: @texto_suave; font-size: 12px;
 }
 QPushButton#capaEscolher:hover {
@@ -131,7 +154,7 @@ QPushButton#capaEscolher:hover {
 
 /* botões de qualidade (128 / 192 / 320) */
 QPushButton#qualidade {
-    background: transparent; border: 1px solid @borda_forte; border-radius: 3px;
+    background: transparent; border: 1px solid @borda_forte; border-radius: @raio;
     padding: 6px 12px; color: @texto_suave;
     font-family: "Consolas", monospace; font-size: 13px;
 }
@@ -143,14 +166,14 @@ QPushButton#qualidade:disabled { color: @texto_fraco; border-color: @borda; }
 
 /* botões gerais */
 QPushButton#secundario {
-    background: @elevado; border: 1px solid @borda_forte; border-radius: 3px;
+    background: @elevado; border: 1px solid @borda_forte; border-radius: @raio;
     padding: 8px 16px;
 }
 QPushButton#secundario:hover { background: @elevado; }
 
 QPushButton#primario {
     background: @azul; color: @texto_sobre_destaque;
-    border: none; border-radius: 3px;
+    border: none; border-radius: @raio;
     padding: 10px 18px; font-weight: 600;
 }
 QPushButton#primario:hover {
@@ -160,7 +183,7 @@ QPushButton#primario:disabled { background: @elevado; color: @texto_suave; }
 
 /* lista de playlists */
 QComboBox {
-    background: @cartao; border: 1px solid @borda_forte; border-radius: 3px;
+    background: @cartao; border: 1px solid @borda_forte; border-radius: @raio;
     padding: 8px 12px; min-width: 150px;
 }
 QComboBox:hover, QComboBox:focus { border-color: @azul; }
@@ -179,7 +202,7 @@ QToolTip {
 QMenu {
     background: @cartao; border: 1px solid @borda; padding: 4px;
 }
-QMenu::item { padding: 8px 24px 8px 14px; border-radius: 2px; }
+QMenu::item { padding: 8px 24px 8px 14px; border-radius: @raio; }
 QMenu::item:selected {
     background: @azul; color: @texto_sobre_destaque;
 }
@@ -188,7 +211,7 @@ QMenu::separator { height: 1px; background: @borda; margin: 4px 6px; }
 QDialog { background: @superficie; }
 QDialog QLabel { color: @texto; }
 QDialog QPushButton {
-    background: @elevado; border: 1px solid @borda_forte; border-radius: 3px;
+    background: @elevado; border: 1px solid @borda_forte; border-radius: @raio;
     padding: 7px 18px; min-width: 70px;
 }
 QDialog QPushButton:hover { background: @elevado; }
@@ -197,11 +220,11 @@ QDialog QPushButton:default { border-color: @azul; color: @azul; }
 /* ===== menu de botão direito (coração, fila, lixeira) ===== */
 
 QFrame#menuMusica {
-    background: @cartao; border: 1px solid @borda; border-radius: 3px;
+    background: @cartao; border: 1px solid @borda; border-radius: @raio;
 }
 
 QPushButton#botaoMenu {
-    background: transparent; border: none; border-radius: 3px; padding: 0;
+    background: transparent; border: none; border-radius: @raio; padding: 0;
 }
 QPushButton#botaoMenu:hover { background: @elevado; }
 QPushButton#botaoMenu:pressed { background: @elevado; }

@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget,
                                QStyledItemDelegate, QVBoxLayout, QWidget)
 
 from ui import temas, util
+from ui.icones import icone, pixmap
 from ui.menu_musica import MenuMusica
 
 class LinhaMusica(QStyledItemDelegate):
@@ -29,6 +30,10 @@ class LinhaMusica(QStyledItemDelegate):
 
         if tocando:
             painter.fillRect(r, QColor(temas.cor("azul_escuro")))
+            if temas.cor("hud"):
+                painter.fillRect(
+                    QRect(r.left(), r.top(), 3, r.height()),
+                    QColor(temas.cor("hud_azul")))
         elif option.state & QStyle.State_Selected:
             painter.fillRect(r, QColor(temas.cor("elevado")))
         elif option.state & QStyle.State_MouseOver:
@@ -55,11 +60,14 @@ class LinhaMusica(QStyledItemDelegate):
                          Qt.AlignRight | Qt.AlignVCenter, util.fmt_tempo(m["duracao"]))
         limite = x_dur - 10
         if m["favorita"]:
-            painter.setPen(QColor(
-                util.TEXTO if tocando or selecionado
-                else temas.cor("lilas_claro")))
-            painter.drawText(QRect(x_dur - 40, r.top(), 24, r.height()),
-                             Qt.AlignCenter, "♥")
+            cor_coracao = (
+                temas.cor("hud_amarelo") or
+                (util.TEXTO if tocando or selecionado
+                 else temas.cor("lilas_claro")))
+            coracao = pixmap(
+                "coracao", cor=cor_coracao, tamanho=18, cheio=True)
+            painter.drawPixmap(
+                x_dur - 34, r.top() + (r.height() - 18) // 2, coracao)
             limite = x_dur - 50
 
         # título e artista
@@ -67,6 +75,7 @@ class LinhaMusica(QStyledItemDelegate):
         largura = max(limite - x_texto, 20)
 
         fonte_titulo = QFont(option.font)
+        fonte_titulo.setFamily("Zen Maru Gothic")
         fonte_titulo.setPixelSize(15)
         painter.setFont(fonte_titulo)
         cor_titulo = (temas.cor("azul_claro") if tocando else
@@ -78,6 +87,7 @@ class LinhaMusica(QStyledItemDelegate):
                          Qt.AlignLeft | Qt.AlignVCenter, titulo)
 
         fonte_artista = QFont(option.font)
+        fonte_artista.setFamily("Zen Maru Gothic")
         fonte_artista.setPixelSize(13)
         painter.setFont(fonte_artista)
         painter.setPen(QColor(
@@ -119,11 +129,18 @@ class PaginaMusicas(QWidget):
         self.busca.setPlaceholderText("Buscar")
         self.busca.textChanged.connect(self._aplicar_filtro)
 
-        btn_shuffle = QPushButton("⇄")
+        btn_shuffle = QPushButton()
         btn_shuffle.setObjectName("botaoIcone")
+        cor_controles = (
+            temas.cor("hud_amarelo") or temas.cor("texto_suave"))
+        btn_shuffle.setIcon(
+            icone("shuffle", cor=cor_controles, tamanho=18))
+        btn_shuffle.setIconSize(QSize(18, 18))
         btn_shuffle.clicked.connect(lambda: self._tocar_aleatorio())
-        btn_play = QPushButton("▶")
+        btn_play = QPushButton()
         btn_play.setObjectName("botaoPlay")
+        btn_play.setIcon(icone("play", cor=cor_controles, tamanho=20))
+        btn_play.setIconSize(QSize(20, 20))
         btn_play.clicked.connect(lambda: self._tocar_tudo())
 
         topo = QWidget()
