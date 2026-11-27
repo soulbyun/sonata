@@ -24,7 +24,8 @@ def criar_tabelas():
                 capa      TEXT,
                 duracao   INTEGER NOT NULL DEFAULT 0,
                 formato   TEXT,
-                favorita  INTEGER NOT NULL DEFAULT 0
+                favorita  INTEGER NOT NULL DEFAULT 0,
+                letra     TEXT NOT NULL DEFAULT ''
             );
 
             CREATE TABLE IF NOT EXISTS playlists (
@@ -42,6 +43,9 @@ def criar_tabelas():
                 FOREIGN KEY (musica_id)   REFERENCES musicas(id)   ON DELETE CASCADE
             );
         """)
+        colunas = {linha["name"] for linha in con.execute("PRAGMA table_info(musicas)")}
+        if "letra" not in colunas:
+            con.execute("ALTER TABLE musicas ADD COLUMN letra TEXT NOT NULL DEFAULT ''")
 
 
 # ---------- músicas ----------
@@ -55,6 +59,26 @@ def adicionar_musica(titulo, artista, caminho, capa=None,
             (titulo, artista, caminho, capa, album, duracao, formato),
         )
         return cursor.lastrowid
+
+
+def definir_letra(musica_id, texto):
+    with conectar() as con:
+        con.execute("UPDATE musicas SET letra = ? WHERE id = ?", (texto, musica_id))
+
+
+def atualizar_musica(musica_id, titulo, artista):
+    with conectar() as con:
+        con.execute(
+            "UPDATE musicas SET titulo = ?, artista = ? WHERE id = ?",
+            (titulo, artista, musica_id),
+        )
+
+
+def definir_capa_musica(musica_id, caminho_capa):
+    with conectar() as con:
+        con.execute(
+            "UPDATE musicas SET capa = ? WHERE id = ?", (caminho_capa, musica_id)
+        )
 
 
 def listar_musicas():
@@ -118,6 +142,17 @@ def listar_musicas_da_playlist(playlist_id):
                ORDER BY pm.posicao""",
             (playlist_id,),
         ).fetchall()
+
+
+def reordenar_playlist(playlist_id, ids_na_ordem):
+    with conectar() as con:
+        con.executemany(
+            """UPDATE playlist_musicas SET posicao = ?
+               WHERE playlist_id = ? AND musica_id = ?""",
+            ((posicao, playlist_id, musica_id)
+             for posicao, musica_id in enumerate(ids_na_ordem)),
+        )
+
 
 def obter_playlist(playlist_id):
     with conectar() as con:

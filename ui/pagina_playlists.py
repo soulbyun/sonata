@@ -2,8 +2,8 @@ import shutil
 import uuid
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, QRect, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
+from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QInputDialog, QLabel,
                                QLineEdit, QListWidget, QListWidgetItem, QMenu,
                                QMessageBox, QPushButton, QStackedWidget, QStyle,
@@ -13,6 +13,7 @@ import db
 import library
 from ui import temas, util
 from ui.pagina_musicas import PaginaMusicas
+from ui.texto_esteira import AnimacaoEsteira
 
 FILTRO_IMAGEM = "Imagens (*.jpg *.jpeg *.png *.webp)"
 
@@ -29,7 +30,7 @@ def _miniatura(banner, musicas, lado=48):
     if banner:
         pm = QPixmap(str(util.RAIZ / banner))
         if not pm.isNull():
-            return _cobrir(pm, lado, lado)
+            return util.arredondar_capa(_cobrir(pm, lado, lado))
 
     pm = QPixmap(lado, lado)
     pm.fill(QColor(temas.cor("elevado")))
@@ -48,7 +49,7 @@ def _miniatura(banner, musicas, lado=48):
         p.setFont(fonte)
         p.drawText(pm.rect(), Qt.AlignCenter, "♪")
     p.end()
-    return pm
+    return util.arredondar_capa(pm)
 
 
 class Banner(QWidget):
@@ -74,6 +75,11 @@ class Banner(QWidget):
         if largura < 1:
             return
         p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        caminho = QPainterPath()
+        raio = int(temas.cor("raio_capa"))
+        caminho.addRoundedRect(QRectF(self.rect()), raio, raio)
+        p.setClipPath(caminho)
         p.fillRect(self.rect(), QColor(temas.cor("cartao")))
 
         if self.banner is not None:
@@ -99,6 +105,9 @@ class LinhaPlaylist(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.itens = []
+        lista = parent
+        self.esteira = AnimacaoEsteira(
+            lista, lambda: lista.viewport().update() if lista is not None else None)
 
     def sizeHint(self, option, index):
         return QSize(0, 66)
@@ -123,9 +132,10 @@ class LinhaPlaylist(QStyledItemDelegate):
         fonte_nome.setPixelSize(15)
         painter.setFont(fonte_nome)
         painter.setPen(QColor(util.TEXTO))
-        nome = painter.fontMetrics().elidedText(pl["nome"], Qt.ElideRight, largura)
-        painter.drawText(QRect(x_texto, r.top() + 13, largura, 20),
-                         Qt.AlignLeft | Qt.AlignVCenter, nome)
+        self.esteira.pintar(
+            painter, QRect(x_texto, r.top() + 13, largura, 20), pl["nome"],
+            fonte_nome, QColor(util.TEXTO), index.row(),
+            bool(option.state & QStyle.State_MouseOver))
 
         fonte_info = QFont(option.font)
         fonte_info.setPixelSize(13)
@@ -150,6 +160,8 @@ class PaginaPlaylists(QWidget):
     tocar = Signal(list, int)
     tocar_aleatorio = Signal(list)
     acao_musica = Signal(str, object)
+    playlist_reordenada = Signal(int)
+
     def __init__(self):
         super().__init__()
         self.playlist_id = None
@@ -175,8 +187,8 @@ class PaginaPlaylists(QWidget):
         topo_layout.addStretch()
         topo_layout.addWidget(btn_nova)
 
-        self.delegate = LinhaPlaylist()
         self.lista = QListWidget()
+        self.delegate = LinhaPlaylist(self.lista)
         self.lista.setItemDelegate(self.delegate)
         self.lista.setMouseTracking(True)
         self.lista.setVerticalScrollMode(QListWidget.ScrollPerPixel)
@@ -197,6 +209,7 @@ class PaginaPlaylists(QWidget):
 
         # ===== parte 2: dentro de uma playlist =====
         self.detalhe = PaginaMusicas("", self._musicas_da_playlist)
+        self.detalhe.habilitar_reordenacao(self._reordenar_musicas)
         self.banner = Banner()
         self.detalhe.colocar_acima(self.banner)
 
@@ -244,6 +257,7 @@ class PaginaPlaylists(QWidget):
             musicas = db.listar_musicas_da_playlist(r["id"])
             r["miniatura"] = _miniatura(r["banner"], musicas[:4])
         self.delegate.itens = resumo
+        self.delegate.esteira.limpar()
 
         self.lista.clear()
         for _r in resumo:
@@ -269,6 +283,15 @@ class PaginaPlaylists(QWidget):
 
     def _musicas_da_playlist(self):
         return db.listar_musicas_da_playlist(self.playlist_id)
+
+    def _reordenar_musicas(self, ids_na_ordem):
+        if self.playlist_id is None:
+            return
+        db.reordenar_playlist(self.playlist_id, ids_na_ordem)
+        playlist = db.obter_playlist(self.playlist_id)
+        if playlist is not None:
+            self.banner.definir(playlist["banner"], self.detalhe.todas)
+        self.playlist_reordenada.emit(self.playlist_id)
 
     def _abrir(self, playlist_id):
         self.playlist_id = playlist_id

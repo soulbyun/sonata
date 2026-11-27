@@ -154,7 +154,7 @@ class ItemArquivo(QFrame):
         layout.addWidget(btn_remover, 0, Qt.AlignVCenter)
 
     def _mostrar_capa(self, pm):
-        self.btn_capa.setIcon(QIcon(_recortar(pm, 72)))
+        self.btn_capa.setIcon(QIcon(util.arredondar_capa(_recortar(pm, 72))))
         self.btn_capa.setText("")
 
     def _escolher_capa(self):
@@ -222,6 +222,8 @@ class PaginaAdicionar(QWidget):
         self._ok = 0
         self._falhas = 0
         self._processados = 0
+        self._dados_lote = []
+        self._erros_lote = []
 
         # --- cabeçalho ---
         titulo = QLabel("Adicionar música")
@@ -353,6 +355,7 @@ class PaginaAdicionar(QWidget):
         if self.importador:
             return
         existentes = {i.caminho for i in self.itens}
+        novos = []
         for c in caminhos:
             p = Path(c)
             if p.is_dir():   # pasta: pega todas as musga dentro dela
@@ -366,11 +369,20 @@ class PaginaAdicionar(QWidget):
                 if f in existentes:
                     continue
                 existentes.add(f)
-                item = ItemArquivo(f)
-                item.atualizar_selo(self.interruptor.isChecked())
-                item.remover.connect(self._remover_item)
-                self.itens.append(item)
-                self.coluna_itens.addWidget(item)
+                novos.append(f)
+        if len(novos) > 1:
+            dados = [
+                {"caminho": str(f), "titulo": f.stem, "artista": "", "capa": None}
+                for f in novos
+            ]
+            self._iniciar_importacao(dados)
+            return
+        for f in novos:
+            item = ItemArquivo(f)
+            item.atualizar_selo(self.interruptor.isChecked())
+            item.remover.connect(self._remover_item)
+            self.itens.append(item)
+            self.coluna_itens.addWidget(item)
         self.lbl_status.setText("")
         self._atualizar_botao()
 
@@ -401,10 +413,16 @@ class PaginaAdicionar(QWidget):
     def _importar(self):
         if not self.itens or self.importador:
             return
-        self._lote = list(self.itens)
+        self._iniciar_importacao(
+            [i.dados() for i in self.itens], list(self.itens))
+
+    def _iniciar_importacao(self, dados, itens_lote=None):
+        self._lote = list(itens_lote or [])
+        self._dados_lote = dados
+        self._erros_lote = []
         self._ok = self._falhas = self._processados = 0
         self.importador = Importador(
-            [i.dados() for i in self._lote],
+            dados,
             self.interruptor.isChecked(),
             self.grupo_q.checkedId(),
             self.combo.currentData(),
@@ -416,20 +434,29 @@ class PaginaAdicionar(QWidget):
         self.importador.start()
 
     def _ao_resultado(self, posicao, erro):
-        item = self._lote[posicao]
         self._processados += 1
-        if erro:
+        if self._lote:
+            item = self._lote[posicao]
+            if erro:
+                self._falhas += 1
+                item.mostrar_erro(erro)       # fica na lista, com o motivo
+            else:
+                self._ok += 1
+                self._tirar(item)             # deu certo: sai da lista
+        elif erro:
             self._falhas += 1
-            item.mostrar_erro(erro)       # fica na lista, com o motivo
+            nome = Path(self._dados_lote[posicao]["caminho"]).name
+            self._erros_lote.append(f"{nome}: {erro}")
         else:
             self._ok += 1
-            self._tirar(item)             # deu certo: sai da lista
-        self.lbl_status.setText(f"Adicionando {self._processados} de {len(self._lote)}…")
+        self.lbl_status.setText(
+            f"Adicionando {self._processados} de {len(self._dados_lote)}…")
 
     def _ao_terminar(self):
         self.importador.wait()
         self.importador = None
         self._lote = []
+        self._dados_lote = []
         if self._ok:
             self.adicionadas.emit()
         partes = []
@@ -437,5 +464,9 @@ class PaginaAdicionar(QWidget):
             partes.append(f"{self._ok} {'música adicionada' if self._ok == 1 else 'músicas adicionadas'}")
         if self._falhas:
             partes.append(f"{self._falhas} {'falhou' if self._falhas == 1 else 'falharam'}")
-        self.lbl_status.setText(", ".join(partes) + ".")
+        resumo = ", ".join(partes) + "."
+        if self._erros_lote:
+            resumo += " " + " | ".join(self._erros_lote)
+        self.lbl_status.setText(resumo)
+        self._erros_lote = []
         self._atualizar_botao()

@@ -3,7 +3,7 @@ import sys
 from PySide6.QtCore import QProcess, Qt, Signal
 from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel,
-                               QMessageBox, QVBoxLayout, QWidget)
+                               QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
 from ui import temas
 
@@ -59,6 +59,8 @@ class CartaoTema(QFrame):
 
 
 class PaginaConfiguracoes(QWidget):
+    editar_musicas = Signal()
+
     def __init__(self):
         super().__init__()
 
@@ -86,6 +88,11 @@ class PaginaConfiguracoes(QWidget):
                 chave, nome, paleta, chave == temas.tema_atual())
             cartao.clicado.connect(self._trocar_tema)
             coluna.addWidget(cartao)
+
+        btn_editar_musicas = QPushButton("Editar músicas e artistas")
+        btn_editar_musicas.setObjectName("secundario")
+        btn_editar_musicas.clicked.connect(self.editar_musicas.emit)
+        coluna.addWidget(btn_editar_musicas)
 
         coluna.addStretch()
 

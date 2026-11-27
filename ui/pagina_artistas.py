@@ -1,4 +1,6 @@
-from PySide6.QtCore import QRect, QSize, Qt, Signal
+import unicodedata
+
+from PySide6.QtCore import QRect, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget,
                                QListWidgetItem, QPushButton, QStackedWidget,
@@ -7,6 +9,14 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget,
 import db
 from ui import temas, util
 from ui.pagina_musicas import PaginaMusicas
+from ui.texto_esteira import AnimacaoEsteira
+
+
+def _chave_ordenacao(texto):
+    normalizado = unicodedata.normalize("NFD", texto.casefold())
+    return "".join(
+        caractere for caractere in normalizado
+        if unicodedata.category(caractere) != "Mn")
 
 
 class LinhaArtista(QStyledItemDelegate):
@@ -15,52 +25,50 @@ class LinhaArtista(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.itens = []
+        lista = parent
+        self.esteira = AnimacaoEsteira(
+            lista, lambda: lista.viewport().update() if lista is not None else None)
 
     def sizeHint(self, option, index):
-        return QSize(0, 66)
+        return QSize(190, 166)
 
     def paint(self, painter, option, index):
         a = self.itens[index.row()]
-        selecionado = bool(option.state & QStyle.State_Selected)
         r = option.rect
         painter.save()
 
-        if selecionado:
-            painter.fillRect(r, QColor(temas.cor("elevado")))
-        elif option.state & QStyle.State_MouseOver:
-            painter.fillRect(r, QColor(temas.cor("cartao")))
+        retangulo = QRectF(r.adjusted(3, 3, -3, -3))
+        sobre = bool(option.state & QStyle.State_MouseOver)
+        selecionado = bool(option.state & QStyle.State_Selected)
+        cor_cartao = (
+            temas.cor("elevado") if sobre or selecionado
+            else temas.cor("cartao"))
+        raio = float(str(temas.cor("raio")).replace("px", ""))
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(cor_cartao))
+        painter.drawRoundedRect(retangulo, raio, raio)
 
-        painter.drawPixmap(r.left() + 14, r.top() + 9,
-                           util.pixmap_capa(a["musica_capa"], 48))
-
-        x_texto = r.left() + 76
-        largura = max(r.right() - 50 - x_texto, 20)
-
+        lado_capa = 88
+        x_capa = r.left() + (r.width() - lado_capa) // 2
+        painter.drawPixmap(
+            x_capa, r.top() + 11, util.pixmap_capa(a["musica_capa"], lado_capa))
+        x_texto = r.left() + 12
+        largura = max(r.width() - 24, 20)
         fonte_nome = QFont(option.font)
         fonte_nome.setFamily("Zen Maru Gothic")
         fonte_nome.setPixelSize(15)
-        painter.setFont(fonte_nome)
-        painter.setPen(QColor(util.TEXTO))
-        nome = painter.fontMetrics().elidedText(a["nome"], Qt.ElideRight, largura)
-        painter.drawText(QRect(x_texto, r.top() + 13, largura, 20),
-                         Qt.AlignLeft | Qt.AlignVCenter, nome)
+        self.esteira.pintar(
+            painter, QRect(x_texto, r.top() + 104, largura, 20), a["nome"],
+            fonte_nome, QColor(util.TEXTO), a["chave"], sobre)
 
         fonte_info = QFont(option.font)
         fonte_info.setPixelSize(13)
         painter.setFont(fonte_info)
-        painter.setPen(QColor(
-            util.TEXTO if selecionado else util.TEXTO_SUAVE))
+        painter.setPen(QColor(util.TEXTO_SUAVE))
         n = a["total"]
         texto = f"{n} {'música' if n == 1 else 'músicas'} · {a['duracao'] // 60} min"
-        painter.drawText(QRect(x_texto, r.top() + 34, largura, 18),
+        painter.drawText(QRect(x_texto, r.top() + 128, largura, 18),
                          Qt.AlignLeft | Qt.AlignVCenter, texto)
-
-        fonte_seta = QFont(option.font)
-        fonte_seta.setPixelSize(20)
-        painter.setFont(fonte_seta)
-        painter.drawText(QRect(r.right() - 40, r.top(), 24, r.height()),
-                         Qt.AlignCenter, "›")
-
         painter.restore()
 
 
@@ -96,10 +104,15 @@ class PaginaArtistas(QWidget):
         topo_layout.addStretch()
         topo_layout.addWidget(self.busca)
 
-        self.delegate = LinhaArtista()
         self.lista = QListWidget()
+        self.delegate = LinhaArtista(self.lista)
         self.lista.setItemDelegate(self.delegate)
         self.lista.setMouseTracking(True)
+        self.lista.setViewMode(QListWidget.IconMode)
+        self.lista.setResizeMode(QListWidget.Adjust)
+        self.lista.setMovement(QListWidget.Static)
+        self.lista.setGridSize(QSize(190, 166))
+        self.lista.setSpacing(8)
         self.lista.setVerticalScrollMode(QListWidget.ScrollPerPixel)
         self.lista.setFocusPolicy(Qt.NoFocus)
         self.lista.itemClicked.connect(self._clicou_artista)
@@ -148,6 +161,15 @@ class PaginaArtistas(QWidget):
     def marcar_tocando(self, musica_id):
         self.detalhe.marcar_tocando(musica_id)
 
+    def abrir_artista(self, nome):
+        self.pilha.setCurrentIndex(0)
+        self._atualizar_lista()
+        chave = nome.casefold()
+        artista = next(
+            (a for a in self.todos if a["nome"].casefold() == chave), None)
+        if artista is not None:
+            self._abrir(artista["chave"], artista["nome"])
+
     # ---------- lista de artistas ----------
 
     def _atualizar_lista(self):
@@ -156,10 +178,11 @@ class PaginaArtistas(QWidget):
         grupos = {}
         for linha in db.listar_musicas():
             m = dict(linha)
-            chave = m["artista"].casefold()
+            nome = m["artista"] or "Artista desconhecido"
+            chave = nome.casefold()
             g = grupos.get(chave)
             if g is None:
-                g = {"chave": chave, "nome": m["artista"], "total": 0,
+                g = {"chave": chave, "nome": nome, "total": 0,
                      "duracao": 0, "musica_capa": m}
                 grupos[chave] = g
             g["total"] += 1
@@ -167,7 +190,9 @@ class PaginaArtistas(QWidget):
             if not g["musica_capa"]["capa"] and m["capa"]:
                 g["musica_capa"] = m      # prefere uma música que tenha capa
 
-        self.todos = sorted(grupos.values(), key=lambda g: g["nome"].casefold())
+        self.todos = sorted(
+            grupos.values(),
+            key=lambda g: (_chave_ordenacao(g["nome"]), g["nome"].casefold()))
         self._aplicar_filtro()
         self.lista.verticalScrollBar().setValue(rolagem)
 
@@ -175,6 +200,7 @@ class PaginaArtistas(QWidget):
         termo = self.busca.text().strip().casefold()
         self.exibidos = [a for a in self.todos if termo in a["nome"].casefold()]
         self.delegate.itens = self.exibidos
+        self.delegate.esteira.limpar()
 
         self.lista.clear()
         for _a in self.exibidos:
@@ -197,7 +223,7 @@ class PaginaArtistas(QWidget):
 
     def _musicas_do_artista(self):
         return [m for m in db.listar_musicas()
-                if m["artista"].casefold() == self.chave]
+                if (m["artista"] or "Artista desconhecido").casefold() == self.chave]
 
     def _abrir(self, chave, nome):
         self.chave = chave

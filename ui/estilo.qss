@@ -65,6 +65,8 @@ QPushButton#coracao {
 QPushButton#coracao:hover {
     background: @lilas_escuro; color: @texto; border-radius: @raio;
 }
+QPushButton#coracao[acaoPainel="true"] { padding: 0; border-radius: @raio; }
+QPushButton#coracao[acaoPainel="true"]:hover { background: @elevado; }
 QLabel#selo {
     background: @lilas_escuro; border: 1px solid @lilas; border-radius: @raio;
     color: @texto; padding: 2px 6px;
@@ -78,6 +80,12 @@ QLineEdit {
     selection-color: @texto_sobre_destaque;
 }
 QLineEdit:focus { border-color: @azul; }
+QPlainTextEdit#editorLetra {
+    background: @cartao; border: 1px solid @borda_forte; border-radius: @raio;
+    color: @texto; padding: 4px;
+    selection-background-color: @azul;
+    selection-color: @texto_sobre_destaque;
+}
 QPushButton#botaoIcone {
     background: transparent; border: none; border-radius: @raio;
     color: @texto_suave; padding: 4px;
@@ -93,6 +101,25 @@ QListWidget { outline: none; }
 QListWidget::item { background: transparent; }
 
 QScrollArea#areaLista > QWidget > QWidget { background: transparent; }
+QScrollArea#areaLista QScrollBar:vertical,
+QListWidget#areaLista QScrollBar:vertical,
+QPlainTextEdit#editorLetra QScrollBar:vertical {
+    width: 0; margin: 0;
+}
+QScrollArea#areaLista QScrollBar:horizontal,
+QListWidget#areaLista QScrollBar:horizontal,
+QPlainTextEdit#editorLetra QScrollBar:horizontal {
+    height: 0; margin: 0;
+}
+QPushButton#secundario[acaoPainel="true"] {
+    background: transparent; border: none; border-radius: @raio; padding: 0;
+}
+QPushButton#secundario[acaoPainel="true"]:hover {
+    background: @elevado;
+}
+QPushButton#secundario[acaoPainel="true"]:checked {
+    background: @azul_escuro; color: @azul_claro;
+}
 
 QFrame#zonaArraste {
     background: @fundo; border: 1px dashed @borda; border-radius: @raio;

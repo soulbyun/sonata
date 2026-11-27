@@ -92,7 +92,10 @@ def adicionar_arquivo(origem, titulo=None, artista=None, capa=None,
 
     tags = ler_tags(origem)
     titulo = titulo or tags["titulo"] or origem.stem
-    artista = artista or tags["artista"] or "Artista desconhecido"
+    if artista is None:
+        artista = tags["artista"] or "Artista desconhecido"
+    else:
+        artista = artista.strip()
 
     nome = uuid.uuid4().hex[:10]   # nome único, evita conflito entre arquivos
 

@@ -65,19 +65,20 @@ MAFTY = {
     "elevado": "#1B202C", "borda": "#262B3A", "borda_forte": "#434B63",
     "texto": "#EEF0F6", "texto_suave": "#A9B0CC", "texto_fraco": "#6F7694",
     "azul": "#4A68FF", "azul_claro": "#8FA2FF", "azul_escuro": "#16205E",
-    "lilas": "#FF3B4E", "lilas_claro": "#FF7A84", "lilas_escuro": "#4A1736",
-    "perigo": "#FF4D5E",
+    "lilas": "#F0002E", "lilas_claro": "#F6495E", "lilas_escuro": "#4A1736",
+    "perigo": "#F02842",
     "fundo_a": "#0E1016", "fundo_b": "#171A24",
     "superficie_a": "#090A0F", "superficie_b": "#0F1118",
     "texto_sobre_destaque": "#FFFFFF",
     "textura": "hud", "textura_opacidade": 0.5,
     "textura_cor": "#FFFFFF",
-    "hud_amarelo": "#F2D400", "hud_vermelho": "#FF3B4E",
+    "hud_amarelo": "#F2D400", "hud_vermelho": "#F0002E",
     "hud_azul": "#4A68FF",
     "raio": "0px", "raio_puxador": "0px",
     "hud": True, "acento_hud": "#A8E10C",
     "marca_dagua": "assets/texturas/mafty.jpg",
     "marca_dagua_opacidade": 0.06, "marca_dagua_tamanho": 0.5,
+    "raio_capa": 0,
 }
 
 TEMAS = {
@@ -89,6 +90,7 @@ TEMAS = {
 
 _PADROES_OPCIONAIS = {
     "raio": "3px",
+    "raio_capa": 6,
     "raio_puxador": "5px",
     "hud": False,
     "acento_hud": "#A8E10C",

@@ -1,14 +1,19 @@
 import html
 
 from PySide6.QtCore import (QAbstractAnimation, QEasingCurve,
-                            QPropertyAnimation, QSize, Qt, Signal)
+                            QEvent, QPropertyAnimation, QSettings, QRect,
+                            QSize, QTimer, Qt, Signal)
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
-                               QGraphicsOpacityEffect, QSizePolicy, QSlider, QStyle,
-                               QStyleOptionSlider, QVBoxLayout)
+from PySide6.QtWidgets import (QFrame, QGraphicsOpacityEffect, QHBoxLayout,
+                               QLabel, QListWidget, QListWidgetItem,
+                               QPlainTextEdit, QPushButton, QScrollArea,
+                               QSizePolicy, QSlider, QStyle, QStyledItemDelegate,
+                               QStyleOptionSlider, QVBoxLayout, QWidget)
 
+import db
 from ui import temas, util
 from ui.icones import icone, pixmap
+from ui.texto_esteira import TextoEsteira
 
 
 class SliderClicavel(QSlider):
@@ -73,6 +78,94 @@ def _icone_controle(nome, tamanho, cor_padrao=None):
     return resultado
 
 
+class _BotaoDiscreto(QPushButton):
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("botaoIcone")
+        self.setIcon(icone("pincel", cor=temas.cor("texto_suave"), tamanho=16))
+        self.setIconSize(QSize(16, 16))
+        self.setFixedSize(28, 28)
+        self.setToolTip("Editar letra")
+        self.setFocusPolicy(Qt.NoFocus)
+        self._opacidade = QGraphicsOpacityEffect(self)
+        self._opacidade.setOpacity(0.25)
+        self.setGraphicsEffect(self._opacidade)
+
+    def enterEvent(self, evento):
+        self._opacidade.setOpacity(0.85)
+        super().enterEvent(evento)
+
+    def leaveEvent(self, evento):
+        self._opacidade.setOpacity(0.25)
+        super().leaveEvent(evento)
+
+
+class _DelegadoFila(QStyledItemDelegate):
+    def paint(self, painter, opcao, indice):
+        painter.save()
+        area = opcao.rect.adjusted(2, 1, -2, -1)
+        if indice.data(Qt.UserRole + 2):
+            painter.setPen(QColor(temas.cor("texto_suave")))
+            painter.drawText(area, Qt.AlignCenter, str(indice.data(Qt.DisplayRole)))
+            painter.restore()
+            return
+
+        atual = bool(indice.data(Qt.UserRole + 1))
+        sobre = bool(opcao.state & QStyle.State_MouseOver)
+        if atual:
+            painter.fillRect(area, QColor(temas.cor("azul_escuro")))
+        elif sobre:
+            painter.fillRect(area, QColor(temas.cor("elevado")))
+
+        cor_texto = temas.cor("azul_claro") if atual else temas.cor("texto")
+        painter.setPen(QColor(cor_texto))
+        texto = str(indice.data(Qt.DisplayRole))
+        texto_area = area.adjusted(8, 0, -36, 0)
+        painter.drawText(texto_area, Qt.AlignLeft | Qt.AlignVCenter, texto)
+
+        area_botao = QRect(area.right() - 30, area.top(), 28, area.height())
+        if sobre:
+            painter.fillRect(area_botao, QColor(temas.cor("cartao")))
+        imagem = pixmap(
+            "lixeira", cor=temas.cor("texto_suave"), tamanho=16)
+        painter.drawPixmap(
+            area_botao.center().x() - 8,
+            area_botao.center().y() - 8,
+            imagem)
+        painter.restore()
+
+class _ListaFila(QListWidget):
+    tocar = Signal(int)
+    remover = Signal(int)
+
+    def __init__(self):
+        super().__init__()
+        self.setItemDelegate(_DelegadoFila(self))
+        self.setUniformItemSizes(True)
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
+        self.setVerticalScrollMode(QListWidget.ScrollPerPixel)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setSelectionMode(QListWidget.NoSelection)
+        self.setFocusPolicy(Qt.NoFocus)
+
+    def mousePressEvent(self, evento):
+        if evento.button() == Qt.LeftButton:
+            ponto = evento.position().toPoint()
+            item = self.itemAt(ponto)
+            if item is not None:
+                indice = item.data(Qt.UserRole)
+                if indice is not None:
+                    if ponto.x() >= self.viewport().width() - 36:
+                        self.remover.emit(indice)
+                    else:
+                        self.tocar.emit(indice)
+            evento.accept()
+            return
+        super().mousePressEvent(evento)
+
+
 class BarraPlayer(QFrame):
     favoritar = Signal(int)   # id da música
 
@@ -87,9 +180,9 @@ class BarraPlayer(QFrame):
         self.capa = QLabel()
         self.capa.setFixedSize(48, 48)
         self.capa.setPixmap(util.pixmap_capa(None, 48))
-        self.lbl_titulo = QLabel("Nada tocando")
+        self.lbl_titulo = TextoEsteira("Nada tocando")
         self.lbl_titulo.setObjectName("barraTitulo")
-        self.lbl_artista = QLabel("")
+        self.lbl_artista = TextoEsteira("")
         self.lbl_artista.setObjectName("barraArtista")
         for rotulo in (self.lbl_titulo, self.lbl_artista):
             rotulo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
@@ -175,11 +268,22 @@ class BarraPlayer(QFrame):
         lbl_vol.setToolTip("Volume")
         self.volume = SliderClicavel(Qt.Horizontal)
         self.volume.setRange(0, 100)
-        self.volume.setValue(50)
+        self._configuracoes = QSettings("Sonata", "Sonata")
+        self.volume.setValue(
+            self._configuracoes.value("volume", 50, type=int))
         self.volume.setFixedWidth(110)
-        self.volume.valueChanged.connect(player.definir_volume)
+        self.volume.valueChanged.connect(self._ao_mudar_volume)
+        player.definir_volume(self.volume.value())
         direita = QHBoxLayout()
         direita.addStretch()
+        self.btn_fila = QPushButton()
+        self.btn_fila.setObjectName("botaoIcone")
+        self.btn_fila.setIcon(_icone_controle("playlist", 18))
+        self.btn_fila.setIconSize(QSize(18, 18))
+        self.btn_fila.setToolTip("Fila")
+        self.btn_fila.setCheckable(True)
+        direita.addWidget(self.btn_fila)
+        direita.addSpacing(14)
         direita.addWidget(lbl_vol)
         direita.addWidget(self.volume)
 
@@ -197,11 +301,16 @@ class BarraPlayer(QFrame):
         player.posicao_mudou.connect(self._ao_mudar_posicao)
         player.duracao_mudou.connect(self._ao_mudar_duracao)
 
+    def _ao_mudar_volume(self, volume):
+        self.player.definir_volume(volume)
+        self._configuracoes.setValue("volume", volume)
+
     def mostrar_musica(self, m):
         self.musica_id = m["id"] if m is not None else None
         self.capa.setPixmap(util.pixmap_capa(m, 48))
         self.lbl_titulo.setText(m["titulo"] if m is not None else "Nada tocando")
-        self.lbl_artista.setText(m["artista"] if m is not None else "")
+        self.lbl_artista.setText(
+            (m["artista"] or "Artista desconhecido") if m is not None else "")
         self.btn_coracao.setVisible(m is not None)
         _estilo_coracao(self.btn_coracao, m is not None and bool(m["favorita"]))
 
@@ -236,16 +345,26 @@ class _PontoHUD(QFrame):
 
 class PainelAtual(QFrame):
     favoritar = Signal(int)
+    artista_clicado = Signal(str)
+    painel_mudou = Signal(str)
 
     def __init__(self):
         super().__init__()
         self.setObjectName("painelAtual")
         self.setFixedWidth(280)
         self.musica_id = None
+        self.player = None
+        self._letra = ""
+        self._editor_letra = None
+        self._painel_aberto = None
+        self._ids_fila = None
+        self._indice_atual_fila = -1
         self._hud = bool(temas.cor("hud"))
 
         secao = QLabel("TOCANDO AGORA")
         secao.setObjectName("secao")
+        secao.setFixedHeight(secao.sizeHint().height())
+        secao.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self._ponto_hud = _PontoHUD(self)
         self._ponto_hud.setFixedSize(8, 8)
         self._ponto_hud.hide()
@@ -272,25 +391,31 @@ class PainelAtual(QFrame):
         self.capa.setFixedSize(232, 232)
         self.capa.setPixmap(util.pixmap_capa(None, 232))
 
-        self.lbl_titulo = QLabel("Nada tocando")
+        self.lbl_titulo = TextoEsteira("Nada tocando")
         self.lbl_titulo.setObjectName("painelTitulo")
-        self.lbl_titulo.setWordWrap(True)
-        self.lbl_artista = QLabel("")
+        self.lbl_titulo.setFixedHeight(self.lbl_titulo.sizeHint().height())
+        self.lbl_artista = TextoEsteira("")
         self.lbl_artista.setObjectName("painelArtista")
-        self.lbl_artista.setWordWrap(True)
+        self.lbl_artista.setFixedHeight(self.lbl_artista.sizeHint().height())
+        self.lbl_artista.setCursor(Qt.PointingHandCursor)
+        self.lbl_artista.setToolTip("Ver artista")
+        self.lbl_artista.installEventFilter(self)
+        for rotulo in (self.lbl_titulo, self.lbl_artista):
+            rotulo.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
 
         self.btn_coracao = QPushButton()
         self.btn_coracao.setObjectName("coracao")
+        self.btn_coracao.setProperty("acaoPainel", True)
+        self.btn_coracao.setFixedSize(36, 36)
+        self.btn_coracao.setIconSize(QSize(20, 20))
+        self.btn_coracao.setToolTip("Favoritar")
         self.btn_coracao.setVisible(False)
         self.btn_coracao.clicked.connect(lambda: self._clicou_coracao())
 
-        linha_titulo = QHBoxLayout()
-        linha_titulo.addWidget(self.lbl_titulo, 1)
-        linha_titulo.addWidget(self.btn_coracao, 0, Qt.AlignTop)
-
         informacoes_musica = QVBoxLayout()
+        informacoes_musica.setContentsMargins(0, 0, 0, 0)
         informacoes_musica.setSpacing(4)
-        informacoes_musica.addLayout(linha_titulo)
+        informacoes_musica.addWidget(self.lbl_titulo)
         informacoes_musica.addWidget(self.lbl_artista)
 
         divisor = QFrame()
@@ -299,8 +424,13 @@ class PainelAtual(QFrame):
 
         self.lbl_album = QLabel("")
         self.lbl_album.setObjectName("painelAlbum")
+        self.lbl_album.setFixedHeight(self.lbl_album.sizeHint().height())
+        self.lbl_album.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.lbl_album.hide()
         self.selo = QLabel("")
         self.selo.setObjectName("selo")
+        self.selo.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
+        self.selo.hide()
         if self._hud:
             cor_hud = temas.cor("hud_amarelo")
             self.selo.setStyleSheet(
@@ -309,9 +439,72 @@ class PainelAtual(QFrame):
                 f"border: 1px solid {cor_hud};"
                 f"border-radius: {temas.cor('raio')};"
                 "}")
-        rodape = QHBoxLayout()
-        rodape.addWidget(self.lbl_album, 1)
-        rodape.addWidget(self.selo)
+        self.btn_letra = QPushButton()
+        self.btn_letra.setObjectName("secundario")
+        self.btn_letra.setProperty("acaoPainel", True)
+        self.btn_letra.setIcon(icone("letra", tamanho=20))
+        self.btn_letra.setIconSize(QSize(20, 20))
+        self.btn_letra.setFixedSize(36, 36)
+        self.btn_letra.setToolTip("Letra")
+        self.btn_letra.setCheckable(True)
+        self.btn_letra.setEnabled(False)
+        self.btn_letra.clicked.connect(
+            lambda: self._alternar_painel("letra"))
+        self.btn_fila = QPushButton()
+        self.btn_fila.setObjectName("secundario")
+        self.btn_fila.setProperty("acaoPainel", True)
+        self.btn_fila.setIcon(icone("playlist", tamanho=20))
+        self.btn_fila.setIconSize(QSize(20, 20))
+        self.btn_fila.setFixedSize(36, 36)
+        self.btn_fila.setToolTip("Fila")
+        self.btn_fila.setCheckable(True)
+        self.btn_fila.clicked.connect(
+            lambda: self._alternar_painel("fila"))
+        linha_acoes = QWidget()
+        linha_acoes.setFixedHeight(36)
+        linha_acoes.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        botoes_painel = QHBoxLayout(linha_acoes)
+        botoes_painel.setContentsMargins(0, 0, 0, 0)
+        botoes_painel.setSpacing(10)
+        botoes_painel.addStretch()
+        botoes_painel.addWidget(self.btn_coracao)
+        botoes_painel.addWidget(self.btn_letra)
+        botoes_painel.addWidget(self.btn_fila)
+        botoes_painel.addStretch()
+
+        self.area_letra = QScrollArea()
+        self.area_letra.setObjectName("areaLista")
+        self.area_letra.setWidgetResizable(True)
+        self.area_letra.setFrameShape(QFrame.NoFrame)
+        self.area_letra.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.area_letra.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.area_letra.setMinimumHeight(220)
+        self.conteudo_letra = QWidget()
+        self.layout_letra = QVBoxLayout(self.conteudo_letra)
+        self.layout_letra.setContentsMargins(2, 2, 2, 2)
+        self.layout_letra.setSpacing(4)
+        self.lbl_letra = QLabel()
+        self.lbl_letra.setObjectName("letraTexto")
+        self.lbl_letra.setTextFormat(Qt.PlainText)
+        self.lbl_letra.setWordWrap(True)
+        self.lbl_letra.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.layout_letra.addWidget(self.lbl_letra)
+        self.btn_editar_letra = _BotaoDiscreto()
+        self.btn_editar_letra.clicked.connect(self._alternar_edicao_letra)
+        self.layout_letra.addWidget(self.btn_editar_letra, 0, Qt.AlignRight)
+        self.area_letra.setWidget(self.conteudo_letra)
+        self.area_letra.hide()
+
+        self.area_fila = _ListaFila()
+        self.area_fila.setObjectName("areaLista")
+        self.area_fila.setMinimumHeight(220)
+        self.area_fila.tocar.connect(self._tocar_na_fila)
+        self.area_fila.remover.connect(self._remover_indice_fila)
+        self.area_fila.hide()
+
+        self._espacador_inferior = QWidget()
+        self._espacador_inferior.setSizePolicy(
+            QSizePolicy.Minimum, QSizePolicy.Expanding)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 16)
@@ -319,9 +512,128 @@ class PainelAtual(QFrame):
         layout.addLayout(linha_secao)
         layout.addWidget(self.capa)
         layout.addLayout(informacoes_musica)
+        layout.addWidget(linha_acoes)
+        layout.addWidget(self.selo, 0, Qt.AlignLeft)
+        layout.addWidget(self.lbl_album)
         layout.addWidget(divisor)
-        layout.addLayout(rodape)
-        layout.addStretch()
+        layout.addWidget(self.area_letra, 1)
+        layout.addWidget(self.area_fila, 1)
+        layout.addWidget(self._espacador_inferior, 1)
+
+    def conectar_player(self, player):
+        self.player = player
+        player.fila_mudou.connect(self.atualizar_fila)
+        self.atualizar_fila()
+
+    def abrir_fila(self):
+        self._definir_painel("fila")
+
+    def _definir_painel(self, nome):
+        self._painel_aberto = nome
+        self.area_letra.setVisible(nome == "letra")
+        self.area_fila.setVisible(nome == "fila")
+        self._espacador_inferior.setVisible(nome not in ("letra", "fila"))
+        self.btn_letra.setChecked(nome == "letra")
+        self.btn_fila.setChecked(nome == "fila")
+        self.painel_mudou.emit(nome or "")
+
+    def _alternar_painel(self, nome):
+        self._definir_painel(None if self._painel_aberto == nome else nome)
+
+    def _atualizar_letra(self):
+        self.lbl_letra.setText(
+            self._letra or "Sem letra. Toque no lápis para adicionar.")
+
+    def _alternar_edicao_letra(self):
+        if self._editor_letra is not None:
+            self._salvar_letra()
+            return
+        if self.musica_id is None:
+            return
+
+        self.lbl_letra.hide()
+        self._editor_letra = QPlainTextEdit()
+        self._editor_letra.setObjectName("editorLetra")
+        self._editor_letra.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self._editor_letra.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._editor_letra.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._editor_letra.setFixedHeight(88)
+        self._editor_letra.setPlainText(self._letra)
+        self._editor_letra.installEventFilter(self)
+        self.layout_letra.insertWidget(0, self._editor_letra)
+        self._editor_letra.setFocus()
+
+    def _salvar_letra(self):
+        editor = self._editor_letra
+        if editor is None:
+            return
+
+        texto = editor.toPlainText()
+        if self.musica_id is not None:
+            db.definir_letra(self.musica_id, texto)
+        self._letra = texto
+        editor.removeEventFilter(self)
+        self.layout_letra.removeWidget(editor)
+        editor.deleteLater()
+        self._editor_letra = None
+        self._atualizar_letra()
+        self.lbl_letra.show()
+
+    def eventFilter(self, watched, evento):
+        if (watched is self.lbl_artista
+                and evento.type() == QEvent.Type.MouseButtonRelease
+                and evento.button() == Qt.LeftButton
+                and self.musica_id is not None):
+            self.artista_clicado.emit(self.lbl_artista.text())
+            return True
+        if (watched is self._editor_letra
+                and evento.type() == QEvent.Type.FocusOut):
+            QTimer.singleShot(0, self._salvar_letra)
+        return super().eventFilter(watched, evento)
+
+    def atualizar_fila(self):
+        musicas = self.player.fila if self.player is not None else []
+        ids = [musica["id"] for musica in musicas]
+        if ids != self._ids_fila:
+            self.area_fila.clear()
+            if not musicas:
+                vazio = QListWidgetItem("Fila vazia")
+                vazio.setSizeHint(QSize(0, 34))
+                vazio.setData(Qt.UserRole + 2, True)
+                self.area_fila.addItem(vazio)
+            else:
+                for indice, musica in enumerate(musicas):
+                    item = QListWidgetItem(musica["titulo"])
+                    item.setSizeHint(QSize(0, 34))
+                    item.setData(Qt.UserRole, indice)
+                    item.setToolTip(
+                        "Clique para tocar; use a lixeira para remover")
+                    self.area_fila.addItem(item)
+            self._ids_fila = ids
+            self._indice_atual_fila = -1
+
+        atual = self.player.indice_fila_atual
+        if 0 <= self._indice_atual_fila < self.area_fila.count():
+            self.area_fila.item(
+                self._indice_atual_fila).setData(Qt.UserRole + 1, False)
+        if 0 <= atual < len(musicas):
+            self.area_fila.item(atual).setData(Qt.UserRole + 1, True)
+        self._indice_atual_fila = atual
+        self.area_fila.viewport().update()
+
+    def _tocar_na_fila(self, indice):
+        if self.player is None:
+            return
+        musicas = self.player.fila
+        if 0 <= indice < len(musicas):
+            self.player.tocar_lista(musicas, indice)
+
+    def _remover_indice_fila(self, indice):
+        if self.player is None:
+            return
+        musicas = self.player.fila
+        if 0 <= indice < len(musicas):
+            self.player.remover_da_fila(musicas[indice]["id"])
 
     def definir_tocando(self, tocando: bool):
         if not self._hud:
@@ -362,10 +674,14 @@ class PainelAtual(QFrame):
         pintor.end()
 
     def mostrar_musica(self, m):
+        if self._editor_letra is not None:
+            self._salvar_letra()
         self.musica_id = m["id"] if m is not None else None
+        self._letra = dict(m).get("letra", "") if m is not None else ""
         self.capa.setPixmap(util.pixmap_capa(m, 232))
         self.lbl_titulo.setText(m["titulo"] if m is not None else "Nada tocando")
-        self.lbl_artista.setText(m["artista"] if m is not None else "")
+        self.lbl_artista.setText(
+            (m["artista"] or "Artista desconhecido") if m is not None else "")
         self.btn_coracao.setVisible(m is not None)
         _estilo_coracao(self.btn_coracao, m is not None and bool(m["favorita"]))
 
@@ -375,9 +691,14 @@ class PainelAtual(QFrame):
                 f"<span style='color:{util.TEXTO_SUAVE}'>Álbum</span> {html.escape(album)}")
         else:
             self.lbl_album.setText("")
+        self.lbl_album.setVisible(bool(album))
         formato = m["formato"] if m is not None else None
         self.selo.setText(formato or "")
         self.selo.setVisible(bool(formato))
+        self.btn_letra.setEnabled(m is not None)
+        self.btn_editar_letra.setEnabled(m is not None)
+        self._atualizar_letra()
+        self.atualizar_fila()
 
     def _clicou_coracao(self):
         if self.musica_id is not None:

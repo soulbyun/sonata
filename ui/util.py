@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPixmap
 
 from ui import temas
 
@@ -43,13 +43,32 @@ def _capa_vazia(musica_id, lado):
     return pm
 
 
+def arredondar_capa(pm):
+    raio = int(temas.cor("raio_capa"))
+    if pm.isNull() or raio <= 0:
+        return pm
+
+    resultado = QPixmap(pm.size())
+    resultado.fill(Qt.transparent)
+    pintor = QPainter(resultado)
+    pintor.setRenderHint(QPainter.Antialiasing)
+    caminho = QPainterPath()
+    caminho.addRoundedRect(QRectF(pm.rect()), raio, raio)
+    pintor.setClipPath(caminho)
+    pintor.drawPixmap(0, 0, pm)
+    pintor.end()
+    return resultado
+
+
 def pixmap_capa(musica, lado):
-    """Capa da música, ou um quadrado colorido com ♪ se ela não tiver capa."""
+    """Capa da música arredondada, ou um quadrado com ♪ se ela não tiver capa."""
     mid = musica["id"] if musica is not None else 0
-    chave = (temas.tema_atual(), mid, lado)
+    raio = temas.cor("raio_capa")
+    chave = (temas.tema_atual(), mid, lado, raio)
     if chave not in _cache:
         pm = None
         if musica is not None and musica["capa"]:
             pm = _capa_real(musica["capa"], lado)
-        _cache[chave] = pm or _capa_vazia(mid, lado)
+        pm = pm or _capa_vazia(mid, lado)
+        _cache[chave] = arredondar_capa(pm)
     return _cache[chave]
