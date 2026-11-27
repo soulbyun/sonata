@@ -15,6 +15,15 @@ TEXTO_SUAVE = temas.cor("texto_suave")
 _cache = {}
 
 
+def atualizar_tema():
+    global AZUL, LILAS, TEXTO, TEXTO_SUAVE
+    AZUL = temas.cor("azul")
+    LILAS = temas.cor("lilas")
+    TEXTO = temas.cor("texto")
+    TEXTO_SUAVE = temas.cor("texto_suave")
+    _cache.clear()
+
+
 def fmt_tempo(segundos):
     segundos = int(segundos)
     return f"{segundos // 60}:{segundos % 60:02d}"

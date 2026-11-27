@@ -25,6 +25,11 @@ class SliderClicavel(QSlider):
         self._icone_alca = pixmap(
             "circle-dashed-duotone", cor=temas.cor("azul_claro"), tamanho=18)
 
+    def atualizar_tema(self):
+        self._icone_alca = pixmap(
+            "circle-dashed-duotone", cor=temas.cor("azul_claro"), tamanho=18)
+        self.update()
+
     def paintEvent(self, evento):
         super().paintEvent(evento)
         opcao = QStyleOptionSlider()
@@ -90,6 +95,9 @@ class _BotaoDiscreto(QPushButton):
         self._opacidade = QGraphicsOpacityEffect(self)
         self._opacidade.setOpacity(0.25)
         self.setGraphicsEffect(self._opacidade)
+
+    def atualizar_tema(self):
+        self.setIcon(icone("pincel", cor=temas.cor("texto_suave"), tamanho=16))
 
     def enterEvent(self, evento):
         self._opacidade.setOpacity(0.85)
@@ -175,6 +183,7 @@ class BarraPlayer(QFrame):
         self.setFixedHeight(88)
         self.player = player
         self.musica_id = None
+        self._musica_atual = None
 
         # --- esquerda: capa, nome e coração ---
         self.capa = QLabel()
@@ -209,11 +218,11 @@ class BarraPlayer(QFrame):
         self.btn_shuffle.setIconSize(QSize(18, 18))
         self.btn_shuffle.setCheckable(True)
         self.btn_shuffle.toggled.connect(player.definir_shuffle)
-        btn_ant = QPushButton()
-        btn_ant.setObjectName("botaoIcone")
-        btn_ant.setIcon(_icone_controle("rewind", 18))
-        btn_ant.setIconSize(QSize(18, 18))
-        btn_ant.clicked.connect(lambda: player.anterior())
+        self.btn_anterior = QPushButton()
+        self.btn_anterior.setObjectName("botaoIcone")
+        self.btn_anterior.setIcon(_icone_controle("rewind", 18))
+        self.btn_anterior.setIconSize(QSize(18, 18))
+        self.btn_anterior.clicked.connect(lambda: player.anterior())
         self.btn_play = QPushButton()
         self.btn_play.setObjectName("botaoPlay")
         cor_play = (
@@ -222,11 +231,11 @@ class BarraPlayer(QFrame):
             _icone_controle("play-duotone", 20, cor_padrao=cor_play))
         self.btn_play.setIconSize(QSize(20, 20))
         self.btn_play.clicked.connect(lambda: player.alternar())
-        btn_prox = QPushButton()
-        btn_prox.setObjectName("botaoIcone")
-        btn_prox.setIcon(_icone_controle("fast-forward", 18))
-        btn_prox.setIconSize(QSize(18, 18))
-        btn_prox.clicked.connect(lambda: player.proxima())
+        self.btn_proxima = QPushButton()
+        self.btn_proxima.setObjectName("botaoIcone")
+        self.btn_proxima.setIcon(_icone_controle("fast-forward", 18))
+        self.btn_proxima.setIconSize(QSize(18, 18))
+        self.btn_proxima.clicked.connect(lambda: player.proxima())
         self.btn_repetir = QPushButton("↻")
         self.btn_repetir.setObjectName("botaoIcone")
         self.btn_repetir.setCheckable(True)
@@ -235,7 +244,8 @@ class BarraPlayer(QFrame):
         controles = QHBoxLayout()
         controles.setSpacing(6)
         controles.addStretch()
-        for b in (self.btn_shuffle, btn_ant, self.btn_play, btn_prox, self.btn_repetir):
+        for b in (self.btn_shuffle, self.btn_anterior, self.btn_play,
+                  self.btn_proxima, self.btn_repetir):
             controles.addWidget(b)
         controles.addStretch()
 
@@ -259,13 +269,13 @@ class BarraPlayer(QFrame):
         centro.addLayout(progresso)
 
         # --- direita: volume ---
-        lbl_vol = QLabel()
-        lbl_vol.setObjectName("secao")
-        lbl_vol.setPixmap(pixmap(
+        self.lbl_volume = QLabel()
+        self.lbl_volume.setObjectName("secao")
+        self.lbl_volume.setPixmap(pixmap(
             "speaker-high-duotone",
             cor=temas.cor("hud_amarelo") or temas.cor("texto_suave"),
             tamanho=18))
-        lbl_vol.setToolTip("Volume")
+        self.lbl_volume.setToolTip("Volume")
         self.volume = SliderClicavel(Qt.Horizontal)
         self.volume.setRange(0, 100)
         self._configuracoes = QSettings("Sonata", "Sonata")
@@ -284,7 +294,7 @@ class BarraPlayer(QFrame):
         self.btn_fila.setCheckable(True)
         direita.addWidget(self.btn_fila)
         direita.addSpacing(14)
-        direita.addWidget(lbl_vol)
+        direita.addWidget(self.lbl_volume)
         direita.addWidget(self.volume)
 
         layout = QHBoxLayout(self)
@@ -293,19 +303,44 @@ class BarraPlayer(QFrame):
         layout.addLayout(centro, 2)
         layout.addLayout(direita, 1)
 
-        player.estado_mudou.connect(
-            lambda tocando: self.btn_play.setIcon(
-                _icone_controle(
-                    "pause-circle-duotone" if tocando else "play-duotone",
-                    20, cor_padrao=cor_play)))
+        player.estado_mudou.connect(self._ao_mudar_estado)
         player.posicao_mudou.connect(self._ao_mudar_posicao)
         player.duracao_mudou.connect(self._ao_mudar_duracao)
+
+    def atualizar_tema(self):
+        self.btn_shuffle.setIcon(_icone_controle("shuffle", 18))
+        self.btn_anterior.setIcon(_icone_controle("rewind", 18))
+        self.btn_proxima.setIcon(_icone_controle("fast-forward", 18))
+        self.btn_fila.setIcon(_icone_controle("playlist", 18))
+        self.lbl_volume.setPixmap(pixmap(
+            "speaker-high-duotone",
+            cor=temas.cor("hud_amarelo") or temas.cor("texto_suave"),
+            tamanho=18))
+        self.slider.atualizar_tema()
+        self.volume.atualizar_tema()
+        self._ao_mudar_estado(self.player.tocando)
+        _estilo_coracao(
+            self.btn_coracao,
+            self._musica_atual is not None
+            and bool(self._musica_atual["favorita"]))
+        self.capa.setPixmap(util.pixmap_capa(self._musica_atual, 48))
+        self.lbl_titulo.update()
+        self.lbl_artista.update()
+        self.update()
+
+    def _ao_mudar_estado(self, tocando):
+        cor_play = (
+            temas.cor("hud_amarelo") or temas.cor("texto_sobre_destaque"))
+        self.btn_play.setIcon(_icone_controle(
+            "pause-circle-duotone" if tocando else "play-duotone",
+            20, cor_padrao=cor_play))
 
     def _ao_mudar_volume(self, volume):
         self.player.definir_volume(volume)
         self._configuracoes.setValue("volume", volume)
 
     def mostrar_musica(self, m):
+        self._musica_atual = m
         self.musica_id = m["id"] if m is not None else None
         self.capa.setPixmap(util.pixmap_capa(m, 48))
         self.lbl_titulo.setText(m["titulo"] if m is not None else "Nada tocando")
@@ -360,6 +395,7 @@ class PainelAtual(QFrame):
         self._ids_fila = None
         self._indice_atual_fila = -1
         self._hud = bool(temas.cor("hud"))
+        self._musica_atual = None
 
         secao = QLabel("TOCANDO AGORA")
         secao.setObjectName("secao")
@@ -386,6 +422,7 @@ class PainelAtual(QFrame):
         if self._hud:
             linha_secao.addWidget(self._ponto_hud, 0, Qt.AlignVCenter)
         linha_secao.addStretch()
+        self._linha_secao = linha_secao
 
         self.capa = QLabel()
         self.capa.setFixedSize(232, 232)
@@ -431,14 +468,7 @@ class PainelAtual(QFrame):
         self.selo.setObjectName("selo")
         self.selo.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         self.selo.hide()
-        if self._hud:
-            cor_hud = temas.cor("hud_amarelo")
-            self.selo.setStyleSheet(
-                "QLabel#selo {"
-                f"color: {cor_hud};"
-                f"border: 1px solid {cor_hud};"
-                f"border-radius: {temas.cor('raio')};"
-                "}")
+        self._atualizar_estilo_selo()
         self.btn_letra = QPushButton()
         self.btn_letra.setObjectName("secundario")
         self.btn_letra.setProperty("acaoPainel", True)
@@ -524,6 +554,45 @@ class PainelAtual(QFrame):
         self.player = player
         player.fila_mudou.connect(self.atualizar_fila)
         self.atualizar_fila()
+
+    def atualizar_tema(self):
+        self._hud = bool(temas.cor("hud"))
+        if self._hud:
+            if self._linha_secao.indexOf(self._ponto_hud) < 0:
+                self._linha_secao.insertWidget(
+                    1, self._ponto_hud, 0, Qt.AlignVCenter)
+        else:
+            self._linha_secao.removeWidget(self._ponto_hud)
+            self._animacao_ponto.stop()
+            self._opacidade_ponto.setOpacity(1.0)
+            self._ponto_hud.hide()
+        self._atualizar_estilo_selo()
+        self.capa.setPixmap(util.pixmap_capa(self._musica_atual, 232))
+        self.btn_letra.setIcon(icone("letra", tamanho=20))
+        self.btn_fila.setIcon(icone("playlist", tamanho=20))
+        self.btn_editar_letra.atualizar_tema()
+        _estilo_coracao(
+            self.btn_coracao,
+            self._musica_atual is not None
+            and bool(self._musica_atual["favorita"]))
+        self._definir_album(self._musica_atual)
+        if self.player is not None and self._hud:
+            self.definir_tocando(self.player.tocando)
+        self.area_letra.viewport().update()
+        self.area_fila.viewport().update()
+        self.update()
+
+    def _atualizar_estilo_selo(self):
+        if not self._hud:
+            self.selo.setStyleSheet("")
+            return
+        cor_hud = temas.cor("hud_amarelo")
+        self.selo.setStyleSheet(
+            "QLabel#selo {"
+            f"color: {cor_hud};"
+            f"border: 1px solid {cor_hud};"
+            f"border-radius: {temas.cor('raio')};"
+            "}")
 
     def abrir_fila(self):
         self._definir_painel("fila")
@@ -676,6 +745,7 @@ class PainelAtual(QFrame):
     def mostrar_musica(self, m):
         if self._editor_letra is not None:
             self._salvar_letra()
+        self._musica_atual = m
         self.musica_id = m["id"] if m is not None else None
         self._letra = dict(m).get("letra", "") if m is not None else ""
         self.capa.setPixmap(util.pixmap_capa(m, 232))
@@ -685,13 +755,7 @@ class PainelAtual(QFrame):
         self.btn_coracao.setVisible(m is not None)
         _estilo_coracao(self.btn_coracao, m is not None and bool(m["favorita"]))
 
-        album = m["album"] if m is not None else None
-        if album:
-            self.lbl_album.setText(
-                f"<span style='color:{util.TEXTO_SUAVE}'>Álbum</span> {html.escape(album)}")
-        else:
-            self.lbl_album.setText("")
-        self.lbl_album.setVisible(bool(album))
+        self._definir_album(m)
         formato = m["formato"] if m is not None else None
         self.selo.setText(formato or "")
         self.selo.setVisible(bool(formato))
@@ -699,6 +763,15 @@ class PainelAtual(QFrame):
         self.btn_editar_letra.setEnabled(m is not None)
         self._atualizar_letra()
         self.atualizar_fila()
+
+    def _definir_album(self, m):
+        album = m["album"] if m is not None else None
+        if album:
+            self.lbl_album.setText(
+                f"<span style='color:{util.TEXTO_SUAVE}'>Álbum</span> {html.escape(album)}")
+        else:
+            self.lbl_album.setText("")
+        self.lbl_album.setVisible(bool(album))
 
     def _clicou_coracao(self):
         if self.musica_id is not None:

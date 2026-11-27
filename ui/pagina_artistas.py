@@ -161,6 +161,11 @@ class PaginaArtistas(QWidget):
     def marcar_tocando(self, musica_id):
         self.detalhe.marcar_tocando(musica_id)
 
+    def atualizar_tema(self):
+        self.delegate.esteira.limpar()
+        self.lista.viewport().update()
+        self.detalhe.atualizar_tema()
+
     def abrir_artista(self, nome):
         self.pilha.setCurrentIndex(0)
         self._atualizar_lista()

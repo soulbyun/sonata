@@ -19,6 +19,11 @@ _CACHE_PIXMAPS = {}
 _CACHE_ICONES = {}
 
 
+def limpar_cache():
+    _CACHE_PIXMAPS.clear()
+    _CACHE_ICONES.clear()
+
+
 def _preparar_svg(svg, cor, cheio):
     svg = svg.replace("currentColor", cor)
 

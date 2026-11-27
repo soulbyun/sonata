@@ -1,8 +1,11 @@
 import random
+from time import monotonic
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+
+import db
 
 RAIZ = Path(__file__).parent
 
@@ -27,9 +30,13 @@ class Player(QObject):
         self._posicao_pendente = None
         self.shuffle = False
         self.repetir = "off"  # "off", "fila" ou "uma"
+        self._reproducao_id = None
+        self._tempo_reproducido = 0.0
+        self._inicio_intervalo = None
+        self._reproducao_contabilizada = False
 
         self._midia.positionChanged.connect(self._ao_mudar_posicao)
-        self._midia.durationChanged.connect(lambda d: self.duracao_mudou.emit(int(d)))
+        self._midia.durationChanged.connect(self._ao_mudar_duracao)
         self._midia.playbackStateChanged.connect(self._ao_mudar_estado)
         self._midia.mediaStatusChanged.connect(self._ao_mudar_status)
 
@@ -142,6 +149,7 @@ class Player(QObject):
         self._montar_ordem(indice)
         musica = self.musica_atual
         caminho = (RAIZ / musica["caminho"]).resolve()
+        self._preparar_reproducao(musica)
         self._midia.stop()
         self._midia.setSource(QUrl.fromLocalFile(str(caminho)))
         self._posicao_pendente = max(0, int(posicao_ms))
@@ -167,6 +175,7 @@ class Player(QObject):
     def _carregar_e_tocar(self):
         self._posicao_pendente = None
         musica = self.musica_atual
+        self._preparar_reproducao(musica)
         caminho = (RAIZ / musica["caminho"]).resolve()
         self._midia.setSource(QUrl.fromLocalFile(str(caminho)))
         self._midia.play()
@@ -251,10 +260,44 @@ class Player(QObject):
                 self._midia.stop()
                 self._midia.setSource(QUrl())   # solta o arquivo, para poder apagá-lo
                 self._fila, self._ordem, self._pos = [], [], -1
+                self._preparar_reproducao(None)
                 self.musica_mudou.emit(None)
         self.fila_mudou.emit()
         
     # ---------- eventos internos ----------
+
+    def _preparar_reproducao(self, musica):
+        self._fechar_intervalo()
+        self._reproducao_id = musica["id"] if musica is not None else None
+        self._tempo_reproducido = 0.0
+        self._inicio_intervalo = None
+        self._reproducao_contabilizada = False
+
+    def _tempo_reproducao_atual(self):
+        tempo = self._tempo_reproducido
+        if self._inicio_intervalo is not None:
+            tempo += max(0.0, monotonic() - self._inicio_intervalo)
+        return tempo
+
+    def _registrar_se_atingiu_limite(self):
+        if self._reproducao_id is None or self._reproducao_contabilizada:
+            return
+        duracao = int(self._midia.duration())
+        limite = min(30.0, duracao / 2000) if duracao > 0 else 30.0
+        if self._tempo_reproducao_atual() >= limite:
+            db.registrar_reproducao(self._reproducao_id)
+            self._reproducao_contabilizada = True
+
+    def _fechar_intervalo(self):
+        if self._inicio_intervalo is not None:
+            self._tempo_reproducido += max(
+                0.0, monotonic() - self._inicio_intervalo)
+            self._inicio_intervalo = None
+        self._registrar_se_atingiu_limite()
+
+    def _ao_mudar_duracao(self, duracao):
+        self._registrar_se_atingiu_limite()
+        self.duracao_mudou.emit(int(duracao))
 
     def _aplicar_posicao_pendente(self):
         if self._posicao_pendente is None:
@@ -268,10 +311,17 @@ class Player(QObject):
         posicao = int(posicao)
         if self._posicao_pendente == posicao:
             self._posicao_pendente = None
+        self._registrar_se_atingiu_limite()
         self.posicao_mudou.emit(posicao)
 
     def _ao_mudar_estado(self, estado):
-        self.estado_mudou.emit(estado == QMediaPlayer.PlaybackState.PlayingState)
+        tocando = estado == QMediaPlayer.PlaybackState.PlayingState
+        if tocando:
+            if self._inicio_intervalo is None:
+                self._inicio_intervalo = monotonic()
+        else:
+            self._fechar_intervalo()
+        self.estado_mudou.emit(tocando)
 
     def _ao_mudar_status(self, status):
         if status in (
@@ -279,7 +329,9 @@ class Player(QObject):
                 QMediaPlayer.MediaStatus.BufferedMedia):
             self._aplicar_posicao_pendente()
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            self._fechar_intervalo()
             if self.repetir == "uma":
+                self._preparar_reproducao(self.musica_atual)
                 self._midia.setPosition(0)
                 self._midia.play()
             else:

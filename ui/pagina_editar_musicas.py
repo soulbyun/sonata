@@ -104,6 +104,17 @@ class PaginaEditarMusicas(QWidget):
     def marcar_tocando(self, musica_id):
         self.biblioteca.marcar_tocando(musica_id)
 
+    def atualizar_tema(self):
+        self.biblioteca.atualizar_tema()
+        if self._musica is None:
+            return
+        if self._capa_selecionada:
+            pixmap = QPixmap(self._capa_selecionada)
+            if not pixmap.isNull():
+                self._mostrar_capa(pixmap)
+        else:
+            self._mostrar_capa(util.pixmap_capa(self._musica, 112))
+
     def _selecionar_musica(self, item):
         indice = self.biblioteca.lista.row(item)
         if not 0 <= indice < len(self.biblioteca.exibidas):

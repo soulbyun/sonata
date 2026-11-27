@@ -240,6 +240,7 @@ class PaginaMusicas(QWidget):
         self.todas = []
         self.exibidas = []
         self._callback_reordenacao = None
+        self._reordenacao_bloqueada = False
 
         # --- cabeçalho ---
         self.lbl_titulo = QLabel(titulo)
@@ -261,19 +262,19 @@ class PaginaMusicas(QWidget):
         self.busca.setPlaceholderText("Buscar")
         self.busca.textChanged.connect(self._aplicar_filtro)
 
-        btn_shuffle = QPushButton()
-        btn_shuffle.setObjectName("botaoIcone")
+        self.btn_shuffle = QPushButton()
+        self.btn_shuffle.setObjectName("botaoIcone")
         cor_controles = (
             temas.cor("hud_amarelo") or temas.cor("texto_suave"))
-        btn_shuffle.setIcon(
+        self.btn_shuffle.setIcon(
             icone("shuffle", cor=cor_controles, tamanho=18))
-        btn_shuffle.setIconSize(QSize(18, 18))
-        btn_shuffle.clicked.connect(lambda: self._tocar_aleatorio())
-        btn_play = QPushButton()
-        btn_play.setObjectName("botaoPlay")
-        btn_play.setIcon(icone("play", cor=cor_controles, tamanho=20))
-        btn_play.setIconSize(QSize(20, 20))
-        btn_play.clicked.connect(lambda: self._tocar_tudo())
+        self.btn_shuffle.setIconSize(QSize(18, 18))
+        self.btn_shuffle.clicked.connect(lambda: self._tocar_aleatorio())
+        self.btn_play = QPushButton()
+        self.btn_play.setObjectName("botaoPlay")
+        self.btn_play.setIcon(icone("play", cor=cor_controles, tamanho=20))
+        self.btn_play.setIconSize(QSize(20, 20))
+        self.btn_play.clicked.connect(lambda: self._tocar_tudo())
 
         topo = QWidget()
         self.topo_layout = QHBoxLayout(topo)
@@ -281,8 +282,8 @@ class PaginaMusicas(QWidget):
         self.topo_layout.addLayout(textos)
         self.topo_layout.addStretch()
         self.topo_layout.addWidget(self.busca)
-        self.topo_layout.addWidget(btn_shuffle)
-        self.topo_layout.addWidget(btn_play)
+        self.topo_layout.addWidget(self.btn_shuffle)
+        self.topo_layout.addWidget(self.btn_play)
 
         # --- lista ---
         self.lista = ListaMusicas()
@@ -328,7 +329,24 @@ class PaginaMusicas(QWidget):
     def habilitar_reordenacao(self, callback):
         self._callback_reordenacao = callback
         self.lista.ordem_alterada.connect(self._ao_reordenar_lista)
-        self.lista.definir_reordenacao(not self.busca.text().strip())
+        self.lista.definir_reordenacao(
+            not self._reordenacao_bloqueada
+            and not self.busca.text().strip())
+
+    def definir_reordenacao_bloqueada(self, bloqueada):
+        self._reordenacao_bloqueada = bloqueada
+        self.lista.definir_reordenacao(
+            not bloqueada and self._callback_reordenacao is not None
+            and not self.busca.text().strip())
+
+    def atualizar_tema(self):
+        cor = temas.cor("hud_amarelo") or temas.cor("texto_suave")
+        self.btn_shuffle.setIcon(
+            icone("shuffle", cor=cor, tamanho=18))
+        self.btn_play.setIcon(icone("play", cor=cor, tamanho=20))
+        self.delegate.esteira.limpar()
+        self.lista.viewport().update()
+        self.update()
 
     # ---------- lista ----------
 
@@ -345,7 +363,8 @@ class PaginaMusicas(QWidget):
                          if termo in m["titulo"].lower()
                          or termo in (m["artista"] or "Artista desconhecido").lower()]
         self.lista.definir_reordenacao(
-            self._callback_reordenacao is not None and not termo)
+            self._callback_reordenacao is not None
+            and not self._reordenacao_bloqueada and not termo)
         self.delegate.musicas = self.exibidas
         self.delegate.esteira.limpar()
 

@@ -106,6 +106,8 @@ class ItemArquivo(QFrame):
         self.setObjectName("itemArquivo")
         self.caminho = Path(caminho)
         self.capa_escolhida = None
+        self._capa_original = None
+        self._erro = None
         tags = library.ler_tags(self.caminho)
 
         # capa (clique para escolher outra)
@@ -154,6 +156,7 @@ class ItemArquivo(QFrame):
         layout.addWidget(btn_remover, 0, Qt.AlignVCenter)
 
     def _mostrar_capa(self, pm):
+        self._capa_original = QPixmap(pm)
         self.btn_capa.setIcon(QIcon(util.arredondar_capa(_recortar(pm, 72))))
         self.btn_capa.setText("")
 
@@ -174,8 +177,15 @@ class ItemArquivo(QFrame):
             self.selo.setText(formato)
 
     def mostrar_erro(self, texto):
+        self._erro = texto
         self.lbl_info.setText("Falhou: " + texto)
         self.lbl_info.setStyleSheet(f"color: {temas.cor('perigo')};")
+
+    def atualizar_tema(self):
+        if self._capa_original is not None:
+            self._mostrar_capa(self._capa_original)
+        if self._erro is not None:
+            self.lbl_info.setStyleSheet(f"color: {temas.cor('perigo')};")
 
     def dados(self):
         return {
@@ -407,6 +417,11 @@ class PaginaAdicionar(QWidget):
         self.faixa_qualidade.setEnabled(ligado)
         for item in self.itens:
             item.atualizar_selo(ligado)
+
+    def atualizar_tema(self):
+        for item in self.itens:
+            item.atualizar_tema()
+        self.update()
 
     # ---------- importar ----------
 

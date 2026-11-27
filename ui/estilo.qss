@@ -103,11 +103,13 @@ QListWidget::item { background: transparent; }
 QScrollArea#areaLista > QWidget > QWidget { background: transparent; }
 QScrollArea#areaLista QScrollBar:vertical,
 QListWidget#areaLista QScrollBar:vertical,
+QListWidget#listaPalco QScrollBar:vertical,
 QPlainTextEdit#editorLetra QScrollBar:vertical {
     width: 0; margin: 0;
 }
 QScrollArea#areaLista QScrollBar:horizontal,
 QListWidget#areaLista QScrollBar:horizontal,
+QListWidget#listaPalco QScrollBar:horizontal,
 QPlainTextEdit#editorLetra QScrollBar:horizontal {
     height: 0; margin: 0;
 }
@@ -144,15 +146,68 @@ QPushButton#botaoPlay {
     border: none; border-radius: @raio;
 }
 QPushButton#botaoPlay:hover { background: @azul_claro; }
+QPushButton#botaoPlay[palco="true"] {
+    border-radius: 24px; padding: 0;
+}
+QPushButton#botaoPlay[palco="true"][mafty="true"] { border-radius: 0px; }
 
 QFrame#card, QFrame#itemArquivo {
     background: @cartao; border: 1px solid @borda; border-radius: @raio;
 }
+QLabel#tituloPagina[tituloPlaylists="true"] {
+    font-size: 26px; font-weight: 700;
+}
+QFrame#palcoPlaylists {
+    background: transparent; border: 1px solid @borda; border-radius: @raio;
+}
+QFrame#palcoPlaylists[mafty="true"] { border-radius: 0px; }
+QLabel#capaPalco {
+    background: transparent; border: none; border-radius: @raio;
+}
+QLabel#capaPalco[mafty="true"] { border-radius: 0px; }
+QLabel#etiquetaPlaylist {
+    color: @texto_fraco; font-size: 11px; font-weight: 600;
+    letter-spacing: 1px;
+}
+QLabel#nomePalco {
+    background: transparent; color: @texto;
+    font-size: 30px; font-weight: 700;
+}
+QLabel#infoPalco { color: @texto_suave; font-size: 15px; }
+QPushButton#secundario[botaoIconePlaylist="true"] {
+    background: transparent; border: none; border-radius: @raio;
+    color: @texto_suave; padding: 4px;
+}
+QPushButton#secundario[botaoIconePlaylist="true"]:hover {
+    background: @elevado; color: @texto;
+}
+QPushButton#playlistPill {
+    background: @cartao; border: 1px solid @borda; border-radius: 22px;
+    color: @texto; padding: 5px 12px; text-align: left; font-size: 13px;
+}
+QPushButton#playlistPill[mafty="true"] { border-radius: 0px; }
+QPushButton#playlistPill:hover { background: @elevado; }
+QPushButton#playlistPill[selecionada="true"] {
+    border-color: @azul; background: @elevado;
+}
+QLabel#tituloPagina[tituloConfiguracoes="true"] {
+    font-size: 28px; font-weight: 700;
+}
 QFrame#cartaoTema {
-    background: @cartao; border: 1px solid @borda; border-radius: @raio;
+    background: @cartao; border: 1px solid @borda; border-radius: 6px;
 }
 QFrame#cartaoTema[selecionado="true"] { border-color: @azul; }
-QLabel#amostraTema { border: 1px solid @borda; border-radius: @raio; }
+QFrame#cartaoTema:hover { background: @elevado; }
+QFrame#cartaoTema[mafty="true"] { border-radius: 0px; }
+QLabel#amostraTema {
+    border: 1px solid @borda; border-radius: @raio;
+}
+QLabel#cardTitulo[secaoConfiguracoes="true"] {
+    font-size: 16px; font-weight: 600;
+}
+QLabel#cardTitulo[tituloTema="true"] {
+    font-size: 13px; font-weight: 600;
+}
 #cardTitulo { font-size: 15px; }
 #cardDesc { font-size: 13px; color: @texto_suave; }
 #infoItem { font-size: 12px; color: @texto_suave; }

@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 
 from PySide6.QtCore import QEvent, QSettings, QSize, QTimer, Qt
 from PySide6.QtGui import (QColor, QCursor, QFont, QKeySequence, QPainter,
@@ -12,14 +13,14 @@ from PySide6.QtWidgets import (QButtonGroup, QFrame, QHBoxLayout, QLabel,
 import db
 import library
 from player import Player
-from ui import temas
+from ui import temas, util
 from ui.pagina_adicionar import PaginaAdicionar
 from ui.pagina_artistas import PaginaArtistas
 from ui.pagina_configuracoes import PaginaConfiguracoes
 from ui.pagina_editar_musicas import PaginaEditarMusicas
 from ui.pagina_musicas import PaginaMusicas
 from ui.pagina_playlists import PaginaPlaylists
-from ui.icones import icone
+from ui.icones import icone, limpar_cache
 from ui.decoracao import DecoracaoOverlay
 from ui.janela_windows import ajustar_janela
 from ui.textura import aplicar_textura
@@ -44,9 +45,7 @@ class _FaixaHUD(QWidget):
 
 
 def _definir_mafty(widget, ativo):
-    if not ativo:
-        return
-    widget.setProperty("mafty", ativo)
+    widget.setProperty("mafty", bool(ativo))
     estilo = widget.style()
     estilo.unpolish(widget)
     estilo.polish(widget)
@@ -60,7 +59,7 @@ class JanelaPrincipal(QMainWindow):
         self.resize(1280, 800)
         self.setMinimumSize(980, 600)
         self._janela_windows_ajustada = False
-        tema_mafty = temas.tema_atual() == "mafty"
+        tema_mafty = bool(temas.cor("hud"))
 
         self.player = Player()
         self._playlist_tocando_id = None
@@ -111,13 +110,12 @@ class JanelaPrincipal(QMainWindow):
         secao = QLabel("BIBLIOTECA")
         secao.setObjectName("secao")
         coluna.addWidget(logo)
-        if temas.cor("hud"):
-            coluna.addWidget(_FaixaHUD(), 0, Qt.AlignLeft)
         coluna.addSpacing(18)
         coluna.addWidget(secao)
 
         self.grupo = QButtonGroup(self)
         self.grupo.setExclusive(True)
+        self._icones_navegacao = []
         itens_navegacao = [
             ("Músicas", "musica"),
             ("Favoritas", "coracao"),
@@ -129,6 +127,7 @@ class JanelaPrincipal(QMainWindow):
             botao.setObjectName("navegacao")
             botao.setIcon(icone(nome_icone, tamanho=18))
             botao.setIconSize(QSize(18, 18))
+            self._icones_navegacao.append((botao, nome_icone, 18))
             botao.setCheckable(True)
             self.grupo.addButton(botao, i)
             coluna.addWidget(botao)
@@ -139,6 +138,8 @@ class JanelaPrincipal(QMainWindow):
         btn_adicionar.setObjectName("adicionar")
         btn_adicionar.setIcon(icone("music-notes-plus-duotone", tamanho=18))
         btn_adicionar.setIconSize(QSize(18, 18))
+        self._icones_navegacao.append(
+            (btn_adicionar, "music-notes-plus-duotone", 18))
         btn_adicionar.setCheckable(True)
         self.grupo.addButton(btn_adicionar, 4)
         coluna.addWidget(btn_adicionar)
@@ -146,6 +147,7 @@ class JanelaPrincipal(QMainWindow):
         btn_configuracoes.setObjectName("navegacao")
         btn_configuracoes.setIcon(icone("engrenagem", tamanho=18))
         btn_configuracoes.setIconSize(QSize(18, 18))
+        self._icones_navegacao.append((btn_configuracoes, "engrenagem", 18))
         btn_configuracoes.setCheckable(True)
         self.grupo.addButton(btn_configuracoes, 5)
         coluna.addWidget(btn_configuracoes)
@@ -172,14 +174,16 @@ class JanelaPrincipal(QMainWindow):
         raiz.addLayout(corpo, 1)
         raiz.addWidget(self.barra)
 
-        superficies_texturizadas = (lateral, self.painel)
-        if not tema_mafty:
-            superficies_texturizadas += (self.barra,)
-        for superficie in superficies_texturizadas:
-            aplicar_textura(superficie)
-        self.decoracao = DecoracaoOverlay(self.pilha)
-        self.textura_pilha = aplicar_textura(self.pilha)
-        self._elevar_overlays()
+        self.lateral = lateral
+        self._coluna_lateral = coluna
+        self.faixa_hud = None
+        if tema_mafty:
+            self.faixa_hud = _FaixaHUD()
+            coluna.insertWidget(1, self.faixa_hud, 0, Qt.AlignLeft)
+        self._camadas_textura = []
+        self.decoracao = None
+        self.textura_pilha = None
+        self._recriar_overlays()
         self.pilha.currentChanged.connect(self._elevar_overlays)
 
         # --- ligações ---
@@ -206,6 +210,7 @@ class JanelaPrincipal(QMainWindow):
         self.pagina_adicionar.adicionadas.connect(self.recarregar)
         self.pagina_configuracoes.editar_musicas.connect(
             self._abrir_edicao_musicas)
+        self.pagina_configuracoes.tema_solicitado.connect(self.aplicar_tema)
         self.pagina_editar_musicas.voltar_solicitado.connect(
             lambda: self.pilha.setCurrentWidget(self.pagina_configuracoes))
         self.pagina_editar_musicas.musicas_atualizadas.connect(
@@ -250,9 +255,79 @@ class JanelaPrincipal(QMainWindow):
             ajustar_janela(self)
 
     def _elevar_overlays(self, indice=None):
-        self.decoracao.raise_()
+        if self.decoracao is not None:
+            self.decoracao.raise_()
         if self.textura_pilha is not None:
             self.textura_pilha.raise_()
+
+    def _remover_overlay(self, overlay):
+        if overlay is None:
+            return
+        pai = overlay.parentWidget()
+        if pai is not None:
+            pai.removeEventFilter(overlay)
+        overlay.hide()
+        overlay.deleteLater()
+
+    def _recriar_overlays(self):
+        for camada in self._camadas_textura:
+            self._remover_overlay(camada)
+        self._camadas_textura.clear()
+        self._remover_overlay(self.decoracao)
+        self._remover_overlay(self.textura_pilha)
+
+        superficies = [self.lateral, self.painel]
+        if not temas.cor("hud"):
+            superficies.append(self.barra)
+        for superficie in superficies:
+            camada = aplicar_textura(superficie)
+            if camada is not None:
+                self._camadas_textura.append(camada)
+
+        self.decoracao = DecoracaoOverlay(self.pilha)
+        self.textura_pilha = aplicar_textura(self.pilha)
+        self._elevar_overlays()
+
+    def _atualizar_faixa_hud(self):
+        hud = bool(temas.cor("hud"))
+        if hud and self.faixa_hud is None:
+            self.faixa_hud = _FaixaHUD()
+            self._coluna_lateral.insertWidget(
+                1, self.faixa_hud, 0, Qt.AlignLeft)
+        elif not hud and self.faixa_hud is not None:
+            self._coluna_lateral.removeWidget(self.faixa_hud)
+            self.faixa_hud.hide()
+            self.faixa_hud.deleteLater()
+            self.faixa_hud = None
+        if self.faixa_hud is not None:
+            self.faixa_hud.update()
+
+    def aplicar_tema(self, nome):
+        if nome != temas.tema_atual():
+            temas.salvar_tema(nome)
+        app = QApplication.instance()
+        temas.aplicar_estilo(
+            app, Path(__file__).resolve().parent / "estilo.qss")
+        util.atualizar_tema()
+        limpar_cache()
+
+        hud = bool(temas.cor("hud"))
+        for widget in (self.pilha, self.lateral, self.painel, self.barra):
+            _definir_mafty(widget, hud)
+        self._atualizar_faixa_hud()
+        for botao, nome_icone, tamanho in self._icones_navegacao:
+            botao.setIcon(icone(nome_icone, tamanho=tamanho))
+        self._recriar_overlays()
+
+        for pagina in self.paginas:
+            pagina.atualizar_tema()
+        self.pagina_adicionar.atualizar_tema()
+        self.pagina_configuracoes.atualizar_tema(nome)
+        self.pagina_editar_musicas.atualizar_tema()
+        self.painel.atualizar_tema()
+        self.barra.atualizar_tema()
+        ajustar_janela(self)
+        self.update()
 
     def recarregar(self):
         for pagina in self.paginas:

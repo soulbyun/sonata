@@ -25,7 +25,8 @@ def criar_tabelas():
                 duracao   INTEGER NOT NULL DEFAULT 0,
                 formato   TEXT,
                 favorita  INTEGER NOT NULL DEFAULT 0,
-                letra     TEXT NOT NULL DEFAULT ''
+                letra     TEXT NOT NULL DEFAULT '',
+                reproducoes INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS playlists (
@@ -46,6 +47,9 @@ def criar_tabelas():
         colunas = {linha["name"] for linha in con.execute("PRAGMA table_info(musicas)")}
         if "letra" not in colunas:
             con.execute("ALTER TABLE musicas ADD COLUMN letra TEXT NOT NULL DEFAULT ''")
+        if "reproducoes" not in colunas:
+            con.execute(
+                "ALTER TABLE musicas ADD COLUMN reproducoes INTEGER NOT NULL DEFAULT 0")
 
 
 # ---------- músicas ----------
@@ -109,6 +113,26 @@ def obter_musica(musica_id):
         return con.execute(
             "SELECT * FROM musicas WHERE id = ?", (musica_id,)
         ).fetchone()
+
+
+def registrar_reproducao(musica_id):
+    with conectar() as con:
+        con.execute(
+            "UPDATE musicas SET reproducoes = reproducoes + 1 WHERE id = ?",
+            (musica_id,),
+        )
+
+
+def listar_mais_tocadas(limite=50):
+    with conectar() as con:
+        return con.execute(
+            """SELECT * FROM musicas
+               WHERE reproducoes > 0
+               ORDER BY reproducoes DESC, titulo COLLATE NOCASE, titulo
+               LIMIT ?""",
+            (limite,),
+        ).fetchall()
+
 
 # ---------- playlists ----------
 
