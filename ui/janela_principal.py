@@ -18,6 +18,7 @@ from ui.pagina_adicionar import PaginaAdicionar
 from ui.pagina_artistas import PaginaArtistas
 from ui.pagina_configuracoes import PaginaConfiguracoes
 from ui.pagina_editar_musicas import PaginaEditarMusicas
+from ui.pagina_inicio import PaginaInicio
 from ui.pagina_musicas import PaginaMusicas
 from ui.pagina_playlists import PaginaPlaylists
 from ui.icones import icone, limpar_cache
@@ -75,6 +76,7 @@ class JanelaPrincipal(QMainWindow):
         QApplication.instance().installEventFilter(self)
 
         # --- páginas ---
+        self.pagina_inicio = PaginaInicio(self.player)
         self.pagina_musicas = PaginaMusicas("Músicas", db.listar_musicas)
         self.pagina_favoritas = PaginaMusicas("Favoritas", db.listar_favoritas)
         self.pagina_playlists = PaginaPlaylists()
@@ -84,16 +86,17 @@ class JanelaPrincipal(QMainWindow):
         self.pagina_editar_musicas = PaginaEditarMusicas()
 
         # a posição aqui é a mesma do botão correspondente na barra lateral
-        self.paginas = [self.pagina_musicas, self.pagina_favoritas,
-                        self.pagina_playlists, self.pagina_artistas]
+        self.paginas = [self.pagina_inicio, self.pagina_musicas,
+                        self.pagina_favoritas, self.pagina_playlists,
+                        self.pagina_artistas]
 
         self.pilha = QStackedWidget()
         _definir_mafty(self.pilha, tema_mafty)
-        for pagina in self.paginas:                 # 0, 1, 2 e 3
+        for pagina in self.paginas:                 # 0 até 4
             self.pilha.addWidget(pagina)
-        self.pilha.addWidget(self.pagina_adicionar)  # 4
-        self.pilha.addWidget(self.pagina_configuracoes)  # 5
-        self.pilha.addWidget(self.pagina_editar_musicas)  # 6
+        self.pilha.addWidget(self.pagina_adicionar)  # 5
+        self.pilha.addWidget(self.pagina_configuracoes)  # 6
+        self.pilha.addWidget(self.pagina_editar_musicas)  # 7
 
         # --- barra lateral ---
         lateral = QFrame()
@@ -117,6 +120,7 @@ class JanelaPrincipal(QMainWindow):
         self.grupo.setExclusive(True)
         self._icones_navegacao = []
         itens_navegacao = [
+            ("Início", "inicio"),
             ("Músicas", "musica"),
             ("Favoritas", "coracao"),
             ("Playlists", "playlist"),
@@ -141,7 +145,7 @@ class JanelaPrincipal(QMainWindow):
         self._icones_navegacao.append(
             (btn_adicionar, "music-notes-plus-duotone", 18))
         btn_adicionar.setCheckable(True)
-        self.grupo.addButton(btn_adicionar, 4)
+        self.grupo.addButton(btn_adicionar, 5)
         coluna.addWidget(btn_adicionar)
         btn_configuracoes = QPushButton("  Configurações")
         btn_configuracoes.setObjectName("navegacao")
@@ -149,7 +153,7 @@ class JanelaPrincipal(QMainWindow):
         btn_configuracoes.setIconSize(QSize(18, 18))
         self._icones_navegacao.append((btn_configuracoes, "engrenagem", 18))
         btn_configuracoes.setCheckable(True)
-        self.grupo.addButton(btn_configuracoes, 5)
+        self.grupo.addButton(btn_configuracoes, 6)
         coluna.addWidget(btn_configuracoes)
 
         self.grupo.idClicked.connect(self._ir_para)
@@ -157,6 +161,7 @@ class JanelaPrincipal(QMainWindow):
         # --- painel da direita e barra de baixo ---
         self.painel = PainelAtual()
         self.barra = BarraPlayer(self.player)
+        self.pagina_inicio.conectar_painel(self.painel)
         _definir_mafty(self.painel, tema_mafty)
         _definir_mafty(self.barra, tema_mafty)
 
@@ -185,27 +190,43 @@ class JanelaPrincipal(QMainWindow):
         self.textura_pilha = None
         self._recriar_overlays()
         self.pilha.currentChanged.connect(self._elevar_overlays)
+        self.pilha.currentChanged.connect(self._ao_mudar_pagina)
 
         # --- ligações ---
         for pagina in self.paginas:
             if pagina is self.pagina_playlists:
                 pagina.tocar.connect(self._tocar_playlist)
                 pagina.tocar_aleatorio.connect(self._tocar_aleatorio_playlist)
+            elif pagina is self.pagina_inicio:
+                pagina.tocar.connect(self._tocar_inicio)
+                pagina.tocar_aleatorio.connect(
+                    self._tocar_aleatorio_inicio)
             else:
                 pagina.tocar.connect(self._tocar)
                 pagina.tocar_aleatorio.connect(self._tocar_aleatorio)
             pagina.acao_musica.connect(self._acao_musica)
+        self.pagina_inicio.playlist_reordenada.connect(
+            self._ao_reordenar_playlist)
         self.pagina_playlists.playlist_reordenada.connect(
             self._ao_reordenar_playlist)
         self.player.musica_mudou.connect(self._ao_mudar_musica)
         self.player.estado_mudou.connect(self.painel.definir_tocando)
         self.player.estado_mudou.connect(self._ao_mudar_estado_reproducao)
+        self.player.fila_mudou.connect(self._sincronizar_shuffle)
         self.painel.conectar_player(self.player)
         self.barra.favoritar.connect(self._alternar_favorita)
         self.barra.btn_fila.clicked.connect(self._abrir_fila)
         self.painel.favoritar.connect(self._alternar_favorita)
         self.painel.painel_mudou.connect(
             lambda nome: self.barra.btn_fila.setChecked(nome == "fila"))
+        self.barra.volume.valueChanged.connect(
+            self.pagina_inicio.sincronizar_volume)
+        self.pagina_inicio.volume.valueChanged.connect(
+            self._sincronizar_volume_barra)
+        self.barra.btn_repetir.clicked.connect(
+            self.pagina_inicio.sincronizar_repeticao)
+        self.pagina_inicio.repetir_mudou.connect(
+            self._sincronizar_repetir_barra)
         self.painel.artista_clicado.connect(self._abrir_artista_do_painel)
         self.pagina_adicionar.adicionadas.connect(self.recarregar)
         self.pagina_configuracoes.editar_musicas.connect(
@@ -217,6 +238,7 @@ class JanelaPrincipal(QMainWindow):
             self._ao_atualizar_musicas_editadas)
 
         self.recarregar()
+        self._ao_mudar_pagina(self.pilha.currentIndex())
         self._restaurar_estado_reproducao()
 
     def _registrar_atalhos(self):
@@ -424,16 +446,50 @@ class JanelaPrincipal(QMainWindow):
         if musica is not None:
             self.barra.mostrar_musica(musica)
             self.painel.mostrar_musica(musica)
+            self.pagina_inicio.mostrar_musica(musica)
 
     def _abrir_artista_do_painel(self, nome):
-        self.grupo.button(3).setChecked(True)
+        self.grupo.button(4).setChecked(True)
         self.pilha.setCurrentWidget(self.pagina_artistas)
         self.pagina_artistas.abrir_artista(nome)
+
+    def _ao_mudar_pagina(self, indice):
+        if indice == 0:
+            self.painel.hide()
+            self.barra.hide()
+            self.pagina_inicio.entrar()
+            return
+        self.pagina_inicio.sair()
+        self.painel.show()
+        self.barra.show()
+
+    def _sincronizar_shuffle(self):
+        bloqueado = self.barra.btn_shuffle.blockSignals(True)
+        self.barra.btn_shuffle.setChecked(self.player.shuffle)
+        self.barra.btn_shuffle.blockSignals(bloqueado)
+
+    def _sincronizar_volume_barra(self, volume):
+        bloqueado = self.barra.volume.blockSignals(True)
+        self.barra.volume.setValue(volume)
+        self.barra.volume.blockSignals(bloqueado)
+
+    def _sincronizar_repetir_barra(self, modo):
+        self.barra.btn_repetir.setChecked(modo != "off")
+        self.barra.btn_repetir.setText("↻1" if modo == "uma" else "↻")
 
     def _ir_para(self, indice):
         self.pilha.setCurrentIndex(indice)
         if indice < len(self.paginas):
             self.paginas[indice].carregar()
+
+    def _tocar_inicio(self, musicas, indice):
+        self._playlist_tocando_id = self.pagina_inicio.playlist_id
+        self.player.tocar_lista(musicas, indice)
+
+    def _tocar_aleatorio_inicio(self, musicas):
+        self._playlist_tocando_id = self.pagina_inicio.playlist_id
+        self.barra.btn_shuffle.setChecked(True)
+        self.player.tocar_lista(musicas, random.randrange(len(musicas)))
 
     def _tocar(self, musicas, indice):
         self._playlist_tocando_id = None
@@ -464,6 +520,7 @@ class JanelaPrincipal(QMainWindow):
             self._playlist_tocando_id = None
             self.barra.mostrar_musica(None)
             self.painel.mostrar_musica(None)
+            self.pagina_inicio.mostrar_musica(None)
             for pagina in self.paginas:
                 pagina.marcar_tocando(None)
             self.pagina_editar_musicas.marcar_tocando(None)
@@ -471,6 +528,7 @@ class JanelaPrincipal(QMainWindow):
         atual = db.obter_musica(m["id"]) or m   # lê o estado mais novo no banco
         self.barra.mostrar_musica(atual)
         self.painel.mostrar_musica(atual)
+        self.pagina_inicio.mostrar_musica(atual)
         for pagina in self.paginas:
             pagina.marcar_tocando(m["id"])
         self.pagina_editar_musicas.marcar_tocando(m["id"])
@@ -488,6 +546,7 @@ class JanelaPrincipal(QMainWindow):
             atual = db.obter_musica(musica_id)
             self.barra.mostrar_musica(atual)
             self.painel.mostrar_musica(atual)
+            self.pagina_inicio.mostrar_musica(atual)
 
     # ---------- menu de botão direito ----------
 

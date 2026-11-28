@@ -11,6 +11,27 @@ from ui.menu_musica import MenuMusica
 from ui.texto_esteira import AnimacaoEsteira
 
 
+def geometria_colunas_inicio(largura):
+    x_coracao = max(0, largura - 60)
+    x_tempo = max(0, x_coracao - 56)
+    x_artista = max(
+        132, min(int(largura * 0.54), x_tempo - 40))
+    largura_artista = max(
+        20, min(int(largura * 0.25), x_tempo - x_artista - 8))
+    return {
+        "numero": 16,
+        "largura_numero": 40,
+        "capa": 64,
+        "titulo": 112,
+        "artista": x_artista,
+        "largura_artista": largura_artista,
+        "coracao": x_coracao,
+        "largura_coracao": 32,
+        "tempo": x_tempo,
+        "largura_tempo": 48,
+    }
+
+
 class ListaMusicas(QListWidget):
     ordem_alterada = Signal(list)
 
@@ -135,6 +156,7 @@ class LinhaMusica(QStyledItemDelegate):
         self.musicas = []
         self.id_tocando = None
         self.lista = parent
+        self.modo_colunas_inicio = False
         lista = self.lista
         self.esteira = AnimacaoEsteira(
             lista, lambda: lista.viewport().update() if lista is not None else None)
@@ -144,6 +166,10 @@ class LinhaMusica(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         m = self.musicas[index.row()]
+        if self.modo_colunas_inicio:
+            self._pintar_colunas_inicio(painter, option, index, m)
+            return
+
         tocando = m["id"] == self.id_tocando
         selecionado = bool(option.state & QStyle.State_Selected)
         r = option.rect
@@ -228,6 +254,94 @@ class LinhaMusica(QStyledItemDelegate):
             cor = temas.cor("hud_azul") or temas.cor("azul_claro")
             y = r.top() if self.lista.indice_insercao == index.row() else r.bottom()
             painter.fillRect(QRect(r.left(), y, r.width(), 1), QColor(cor))
+
+    def _pintar_colunas_inicio(self, painter, option, index, musica):
+        tocando = musica["id"] == self.id_tocando
+        selecionado = bool(option.state & QStyle.State_Selected)
+        sobre = bool(option.state & QStyle.State_MouseOver)
+        r = option.rect
+        colunas = geometria_colunas_inicio(r.width())
+
+        painter.save()
+        if tocando:
+            painter.fillRect(r, QColor(temas.cor("azul_escuro")))
+            if temas.cor("hud"):
+                painter.fillRect(
+                    QRect(r.left(), r.top(), 3, r.height()),
+                    QColor(temas.cor("hud_azul")))
+        elif selecionado:
+            painter.fillRect(r, QColor(temas.cor("elevado")))
+        elif sobre:
+            painter.fillRect(r, QColor(temas.cor("cartao")))
+
+        cor_numero = (
+            temas.cor("azul_claro") if tocando else
+            util.TEXTO if selecionado else temas.cor("texto_suave"))
+        fonte_numero = QFont(option.font)
+        fonte_numero.setPixelSize(13)
+        painter.setFont(fonte_numero)
+        painter.setPen(QColor(cor_numero))
+        painter.drawText(
+            QRect(r.left() + colunas["numero"], r.top(),
+                  colunas["largura_numero"], r.height()),
+            Qt.AlignCenter, "▶" if tocando else str(index.row() + 1))
+
+        lado_capa = 36
+        painter.drawPixmap(
+            r.left() + colunas["capa"],
+            r.top() + (r.height() - lado_capa) // 2,
+            util.pixmap_capa(musica, lado_capa))
+
+        x_titulo = r.left() + colunas["titulo"]
+        x_artista = r.left() + colunas["artista"]
+        x_coracao = r.left() + colunas["coracao"]
+        x_tempo = r.left() + colunas["tempo"]
+        largura_titulo = max(20, x_artista - x_titulo - 8)
+        largura_artista = colunas["largura_artista"]
+        cor_titulo = (
+            temas.cor("azul_claro") if tocando else
+            util.TEXTO if selecionado else
+            temas.cor("lilas_claro") if musica["favorita"] else util.TEXTO)
+        ativo = tocando or sobre
+
+        fonte_titulo = QFont(option.font)
+        fonte_titulo.setFamily("Zen Maru Gothic")
+        fonte_titulo.setPixelSize(15)
+        painter.setPen(QColor(cor_titulo))
+        self.esteira.pintar(
+            painter, QRect(x_titulo, r.top(), largura_titulo, r.height()),
+            musica["titulo"], fonte_titulo, QColor(cor_titulo),
+            musica["id"], ativo, Qt.AlignLeft | Qt.AlignVCenter)
+
+        cor_artista = (
+            util.TEXTO if tocando or selecionado
+            else temas.cor("texto_suave"))
+        fonte_artista = QFont(option.font)
+        fonte_artista.setFamily("Zen Maru Gothic")
+        fonte_artista.setPixelSize(13)
+        painter.setPen(QColor(cor_artista))
+        self.esteira.pintar(
+            painter, QRect(x_artista, r.top(), largura_artista, r.height()),
+            musica["artista"] or "Artista desconhecido", fonte_artista,
+            QColor(cor_artista), (musica["id"], "artista"), ativo,
+            Qt.AlignLeft | Qt.AlignVCenter)
+
+        if musica["favorita"]:
+            cor_coracao = (
+                temas.cor("hud_amarelo") or
+                (util.TEXTO if tocando or selecionado
+                 else temas.cor("lilas_claro")))
+            painter.drawPixmap(
+                x_coracao + (colunas["largura_coracao"] - 18) // 2,
+                r.top() + (r.height() - 18) // 2,
+                pixmap("coracao", cor=cor_coracao, tamanho=18, cheio=True))
+
+        painter.setPen(QColor(
+            util.TEXTO if tocando or selecionado else temas.cor("texto_suave")))
+        painter.drawText(
+            QRect(x_tempo, r.top(), colunas["largura_tempo"], r.height()),
+            Qt.AlignRight | Qt.AlignVCenter, util.fmt_tempo(musica["duracao"]))
+        painter.restore()
 
 
 class PaginaMusicas(QWidget):

@@ -104,12 +104,14 @@ QScrollArea#areaLista > QWidget > QWidget { background: transparent; }
 QScrollArea#areaLista QScrollBar:vertical,
 QListWidget#areaLista QScrollBar:vertical,
 QListWidget#listaPalco QScrollBar:vertical,
+QListWidget#listaInicioMusicas QScrollBar:vertical,
 QPlainTextEdit#editorLetra QScrollBar:vertical {
     width: 0; margin: 0;
 }
 QScrollArea#areaLista QScrollBar:horizontal,
 QListWidget#areaLista QScrollBar:horizontal,
 QListWidget#listaPalco QScrollBar:horizontal,
+QListWidget#listaInicioMusicas QScrollBar:horizontal,
 QPlainTextEdit#editorLetra QScrollBar:horizontal {
     height: 0; margin: 0;
 }
@@ -146,6 +148,9 @@ QPushButton#botaoPlay {
     border: none; border-radius: @raio;
 }
 QPushButton#botaoPlay:hover { background: @azul_claro; }
+QPushButton#botaoPlay[playInicio="true"] {
+    border-radius: 24px; padding: 0;
+}
 QPushButton#botaoPlay[palco="true"] {
     border-radius: 24px; padding: 0;
 }
@@ -153,6 +158,54 @@ QPushButton#botaoPlay[palco="true"][mafty="true"] { border-radius: 0px; }
 
 QFrame#card, QFrame#itemArquivo {
     background: @cartao; border: 1px solid @borda; border-radius: @raio;
+}
+QWidget#centroInicio, QWidget#conteudoInicio, QWidget#heroInicio,
+QWidget#linhaTituloInicio {
+    background: transparent;
+}
+QLabel#capaInicio { background: transparent; border-radius: 3px; }
+QLabel#seloInicio {
+    background: @cartao; border: 1px solid @borda;
+    border-radius: 3px; color: @texto; padding: 2px 6px;
+}
+QLabel#statusInicio {
+    color: @texto_suave; font-size: 11px; font-weight: 600;
+    letter-spacing: 1px;
+}
+QLabel#tituloMusicaInicio {
+    color: @texto; font-family: "Zen Maru Gothic";
+    font-size: 28px; font-weight: 700;
+}
+QLabel#artistaMusicaInicio {
+    color: @texto_suave; font-family: "Zen Maru Gothic";
+    font-size: 20px;
+}
+QLabel#tempoInicio { color: @texto_suave; font-size: 12px; }
+QLabel#iconeVolumeInicio { background: transparent; }
+QSlider#volumeInicio::groove:horizontal { height: 3px; }
+QSlider#volumeInicio::handle:horizontal { width: 14px; height: 14px; }
+QPushButton#toggleLetraInicio {
+    background: transparent; border: none; border-radius: 3px;
+    color: @texto_suave; padding: 4px 2px; text-align: left;
+}
+QPushButton#toggleLetraInicio:hover { color: @texto; }
+QPushButton#abaInicio {
+    background: transparent; border: none;
+    border-bottom: 2px solid transparent; border-radius: 3px;
+    color: @texto_suave; padding: 8px 0;
+}
+QPushButton#abaInicio:hover { color: @texto; background: @elevado; }
+QPushButton#abaInicio:checked {
+    color: @texto; border-bottom-color: @azul;
+}
+QWidget#cabecalhoMusicasInicio {
+    background: transparent; border-bottom: 1px solid @borda;
+}
+QScrollArea#areaAbasInicio {
+    background: transparent; border: none;
+}
+QFrame#popupFilaInicio {
+    background: @cartao; border: 1px solid @borda; border-radius: 3px;
 }
 QLabel#tituloPagina[tituloPlaylists="true"] {
     font-size: 26px; font-weight: 700;

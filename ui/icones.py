@@ -17,6 +17,7 @@ _ALIAS = {
 }
 _CACHE_PIXMAPS = {}
 _CACHE_ICONES = {}
+_TAMANHOS = (16, 20, 24, 32)
 
 
 def limpar_cache():
@@ -52,9 +53,20 @@ def _preparar_svg(svg, cor, cheio):
     return svg
 
 
+def _normalizar_tamanho(tamanho):
+    return min(_TAMANHOS, key=lambda opcao: (abs(opcao - tamanho), -opcao))
+
+
+def _escala_tela():
+    tela = QGuiApplication.primaryScreen()
+    return float(tela.devicePixelRatio()) if tela else 1.0
+
+
 def pixmap(nome, cor=None, tamanho=20, cheio=False) -> QPixmap:
     cor = cor or temas.cor("texto_suave")
-    chave = (nome, cor, tamanho, cheio)
+    tamanho = _normalizar_tamanho(tamanho)
+    escala = _escala_tela()
+    chave = (nome, tamanho, cor, escala, cheio)
     if chave in _CACHE_PIXMAPS:
         return _CACHE_PIXMAPS[chave]
 
@@ -68,8 +80,6 @@ def pixmap(nome, cor=None, tamanho=20, cheio=False) -> QPixmap:
     svg = _preparar_svg(svg, cor, cheio)
     renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
 
-    tela = QGuiApplication.primaryScreen()
-    escala = tela.devicePixelRatio() if tela else 1.0
     imagem = QPixmap(max(1, round(tamanho * escala)),
                      max(1, round(tamanho * escala)))
     imagem.setDevicePixelRatio(escala)
@@ -77,7 +87,12 @@ def pixmap(nome, cor=None, tamanho=20, cheio=False) -> QPixmap:
 
     if renderer.isValid():
         pintor = QPainter(imagem)
+        pintor.setRenderHint(QPainter.Antialiasing)
+        pintor.setRenderHint(QPainter.SmoothPixmapTransform)
         renderer.render(pintor, QRectF(0, 0, tamanho, tamanho))
+        pintor.setCompositionMode(QPainter.CompositionMode_SourceIn)
+        pintor.fillRect(
+            QRectF(0, 0, tamanho, tamanho), QColor(cor))
         pintor.end()
 
     _CACHE_PIXMAPS[chave] = imagem
@@ -85,13 +100,16 @@ def pixmap(nome, cor=None, tamanho=20, cheio=False) -> QPixmap:
 
 
 def icone(nome, cor=None, tamanho=20, cheio=False) -> QIcon:
-    chave = (nome, cor, tamanho, cheio)
+    cor = cor or temas.cor("texto_suave")
+    tamanho = _normalizar_tamanho(tamanho)
+    escala = _escala_tela()
+    chave = (nome, tamanho, cor, escala, cheio, temas.cor("azul"))
     if chave in _CACHE_ICONES:
         return _CACHE_ICONES[chave]
 
     icone_resultado = QIcon()
     icone_resultado.addPixmap(
-        pixmap(nome, cor or temas.cor("texto_suave"), tamanho, cheio),
+        pixmap(nome, cor, tamanho, cheio),
         QIcon.Normal, QIcon.Off)
     icone_resultado.addPixmap(
         pixmap(nome, temas.cor("azul"), tamanho, cheio),
